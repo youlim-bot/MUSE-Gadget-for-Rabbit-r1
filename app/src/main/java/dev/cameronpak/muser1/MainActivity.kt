@@ -603,7 +603,6 @@ class MainActivity : Activity() {
         fun entry(id:String,title:String,subtitle:String,section:String=appearance,action:()->Unit)=MuseSettingsDialog.Entry(id,title,subtitle,section,action)
         val entries=listOf(
             entry("wifi","Wi-Fi","",connection){openWifiPanel()},
-            entry("device",funText("기기·Muse 연결","デバイス・Muse接続","Device & Muse connection"),"",connection){showControls()},
             entry("reading",funText("글자 크기·음성 속도","文字サイズ・音声速度","Text size & voice speed"),funText("편하게 읽고 듣기","読みやすさ・聞きやすさ","Reading and speech preferences")){showReadingSettings()},
             entry("volume",funText("음량","音量","Volume"),funText("음성 답변·배경음 크기","音声応答・BGMの音量","Voice and music volume")){showVolumeSettings()},
             entry("screen",funText("화면 자동 꺼짐","画面の自動消灯","Screen timeout"),funText("Muse 화면 계속 켜기 선택","Muse画面の常時点灯","Choose whether Muse stays awake")){showScreenTimeoutSettings()},
