@@ -37,3 +37,5 @@ Weather is a separate HTTPS request to Open-Meteo using coordinates rounded to t
 날씨는 반올림한 좌표로 Open-Meteo에 조회하며 지역명은 Android 지오코더를 사용합니다. 위치 기록은 저장하지 않습니다. 리마인더는 기기 내부에 저장합니다.
 
 天気は丸めた座標でOpen-Meteoに問い合わせ、地域名はAndroidのジオコーダーを利用します。位置履歴は保存せず、リマインダーは端末内に保存します。
+
+Activity modes store the selected mode, practice language/scenario and hunt target locally. Practice text goes to Muse; configured ElevenLabs transcribes voice practice. Hunt photos are sent only after the existing photo-review confirmation. No scores or audio archive are added. The clock idle delay is a local preference.

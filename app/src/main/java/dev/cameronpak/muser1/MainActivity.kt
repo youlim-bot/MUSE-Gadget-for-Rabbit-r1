@@ -76,6 +76,51 @@ class MainActivity : Activity() {
     private var deskClock: DeskClockDialog? = null
     private var charging = false
     private var batteryPercent = 0
+    private val funModes by lazy { FunModes(this) }
+    private lateinit var funStatus: Button
+    private fun funText(ko:String,ja:String,en:String)=UiText.text(this,ko,ja,en)
+    private fun refreshFunStatus() {
+        if(!::funStatus.isInitialized)return
+        funStatus.visibility=if(funModes.mode.isEmpty())View.GONE else View.VISIBLE
+        funStatus.text=if(funModes.mode=="practice") funText("회화 연습","会話練習","Practice")+" · "+funModes.language.label+" ▾"
+            else funText("보물찾기","宝探し","Treasure hunt")+" · "+huntLabel()+" ▾"
+    }
+    private fun huntLabel()=arrayOf(
+        funText("빨간 물건","赤いもの","Something red"),funText("동그란 물건","丸いもの","Something round"),
+        funText("식물","植物","A plant"),funText("책","本","A book"),funText("줄무늬 물건","しま模様のもの","Something striped"))[funModes.mission]
+    private fun endFunMode(){funModes.mode="";refreshFunStatus();stopReplySpeech()}
+    private fun showHunt() {
+        stopContinuous(false);speech.stop();funModes.mode="hunt";refreshFunStatus()
+        controls=AlertDialog.Builder(this).setTitle(funText("카메라 보물찾기","カメラ宝探し","Camera treasure hunt"))
+            .setMessage(huntLabel()+"\n\n"+funText("주변의 물건을 찍어 Muse에게 확인받으세요. 사진 전송 전 확인할 수 있습니다.","身近なものを撮ってMuseに確認しましょう。送信前に写真を確認できます。","Photograph a nearby object and ask Muse to check it. Review the photo before sending."))
+            .setPositiveButton(funText("사진 찍기","撮影","Take photo")){_,_->
+                val lang=when(UiText.language(this)){DisplayLanguage.KO->InputLanguage.KOREAN;DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH}
+                startActivity(Intent(this,CameraActivity::class.java).putExtra("hunt_prompt",FunPrompts.hunt(huntLabel(),lang)).putExtra("hunt_language",lang.name))
+            }.setNeutralButton(funText("다른 미션","別のミッション","Another target")){_,_->funModes.mission=(funModes.mission+1)%5;showHunt()}
+            .setNegativeButton(funText("종료","終了","End")){_,_->endFunMode()}.show()
+    }
+    private fun choosePractice() {
+        stopContinuous(false);speech.stop()
+        controls=AlertDialog.Builder(this).setTitle(funText("연습할 언어","練習する言語","Practice language"))
+            .setItems(arrayOf("한국어","日本語","English")){_,which->
+                val chosen=arrayOf(InputLanguage.KOREAN,InputLanguage.JAPANESE,InputLanguage.ENGLISH)[which]
+                controls=AlertDialog.Builder(this).setTitle(funText("상황 선택 · 연습 시작","場面を選んで開始","Choose a scenario to start"))
+                    .setItems(arrayOf(funText("카페 주문","カフェで注文","Order at a cafe"),funText("여행·길 묻기","旅行・道を尋ねる","Travel / directions"),funText("일상 대화","日常会話","Everyday chat"))){_,scene->
+                        if(!connected || sending || recording){screen.showNotice(funText("Muse 연결 후 다시 시작해 주세요.","Muse接続後に再開してください。","Connect to Muse before starting."));return@setItems}
+                        funModes.language=chosen;funModes.scene=scene;funModes.mode="practice"
+                        languageMode=languageMode.copy(interpreting=false);saveLanguageMode();refreshFunStatus()
+                        sendTypedMessage(funText("역할극을 시작해 줘.","ロールプレイを始めて。","Let's start the role-play."))
+                    }.setNegativeButton(tr("닫기"),null).show()
+            }.setNegativeButton(tr("닫기"),null).show()
+    }
+    private fun showPracticeControls() {
+        controls=AlertDialog.Builder(this).setTitle(funText("회화 파트너","会話パートナー","Conversation partner"))
+            .setMessage(funText("측면 버튼으로 말하거나 키보드로 답하세요. 짧은 답변과 표현 교정을 받습니다. 발음 평가는 하지 않습니다.","サイドボタンで話すか文字で返答。短い応答と表現の訂正を行います。発音採点はしません。","Use the side button or keyboard to reply. Get brief replies and expression corrections, not pronunciation scores."))
+            .setPositiveButton(funText("언어·상황 변경","言語・場面を変更","Change scenario")){_,_->choosePractice()}
+            .setNeutralButton(funText("키보드로 답하기","文字で返答","Type reply")){_,_->showComposer()}
+            .setNegativeButton(funText("연습 종료","練習終了","End practice")){_,_->endFunMode()}.show()
+    }
+    private fun practicePayload(text:String)=FunPrompts.practice(funModes.language,funModes.scenarios[funModes.scene],text)
     private var batteryRegistered = false
     private lateinit var batteryStatus: TextView
     private fun refreshBatteryStatus() {
@@ -96,6 +141,7 @@ class MainActivity : Activity() {
             val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
             batteryPercent = (intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 0) * 100 / scale).coerceIn(0,100)
             refreshBatteryStatus()
+            if(::screen.isInitialized)screen.setCharging(charging)
             if (!charging) closeDeskClock()
         }
     }
@@ -104,9 +150,21 @@ class MainActivity : Activity() {
         if (deskClock != null || !charging) return
         deskClock = DeskClockDialog(this, { batteryPercent }) { deskClock = null; lastInteraction = android.os.SystemClock.elapsedRealtime() }.also { it.show() }
     }
+    private val deskDelayOptions = intArrayOf(10,20,30,60,120,300)
+    private val deskDelaySeconds get() = getSharedPreferences("reading", MODE_PRIVATE).getInt("desk_clock_delay_seconds",20).takeIf { it in deskDelayOptions } ?: 20
+    private fun deskDelayLabel(seconds:Int):String = if(seconds<60) funText("${seconds}초","${seconds}秒","${seconds} sec") else funText("${seconds/60}분","${seconds/60}分","${seconds/60} min")
+    private fun showDeskDelaySettings() {
+        controls=AlertDialog.Builder(this).setTitle(funText("시계 전환 대기 시간","時計への切替待ち時間","Clock idle delay"))
+            .setSingleChoiceItems(deskDelayOptions.map { deskDelayLabel(it) }.toTypedArray(),deskDelayOptions.indexOf(deskDelaySeconds)){dialog,index->
+                getSharedPreferences("reading",MODE_PRIVATE).edit().putInt("desk_clock_delay_seconds",deskDelayOptions[index]).apply()
+                lastInteraction=android.os.SystemClock.elapsedRealtime();dialog.dismiss();showDeskClockSettings()
+            }.setNegativeButton(tr("닫기"),null).create().also { d->
+                d.setOnDismissListener { lastInteraction=android.os.SystemClock.elapsedRealtime() };d.show()
+            }
+    }
     private fun updateDeskClock() {
         if (deskEnabled && charging && deskClock == null && hasWindowFocus() &&
-            android.os.SystemClock.elapsedRealtime() - lastInteraction >= 20000 &&
+            android.os.SystemClock.elapsedRealtime() - lastInteraction >= deskDelaySeconds * 1000L &&
             !recording && !sending && !continuous && !speech.hasPlayback &&
             clockDialog == null && controls?.isShowing != true && composer == null && quickDialog == null &&
             clearDialog?.isShowing != true && languageDialog?.isShowing != true && displayLanguagePopup?.isShowing != true) openDeskClock()
@@ -114,13 +172,16 @@ class MainActivity : Activity() {
     private fun showDeskClockSettings() {
         controls = AlertDialog.Builder(this).setTitle(UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"))
             .setSingleChoiceItems(arrayOf(
-                UiText.text(this,"켜기 · 충전 중 20초 후 표시","オン · 充電中20秒後に表示","On · after 20 seconds idle while plugged in"),
+                UiText.text(this,"켜기 · ${deskDelayLabel(deskDelaySeconds)} 후 표시","オン · ${deskDelayLabel(deskDelaySeconds)}後に表示","On · after ${deskDelayLabel(deskDelaySeconds)} idle"),
                 UiText.text(this,"끄기","オフ","Off")), if(deskEnabled)0 else 1) { dialog, index ->
                 getSharedPreferences("reading",MODE_PRIVATE).edit().putBoolean("desk_clock",index==0).apply()
                 lastInteraction=android.os.SystemClock.elapsedRealtime();dialog.dismiss()
-            }.setPositiveButton(UiText.text(this,"지금 보기","今すぐ表示","Show now")){_,_->
+            }.setNeutralButton(funText("대기 시간","待ち時間","Idle delay")){_,_->showDeskDelaySettings()}
+            .setPositiveButton(UiText.text(this,"지금 보기","今すぐ表示","Show now")){_,_->
                 if(charging)openDeskClock() else android.widget.Toast.makeText(this,UiText.text(this,"충전기를 연결해 주세요","充電器を接続してください","Connect a charger first"),android.widget.Toast.LENGTH_SHORT).show()
-            }.setNegativeButton(tr("닫기"),null).show()
+            }.setNegativeButton(tr("닫기"),null).create().also { d->
+                d.setOnDismissListener { lastInteraction=android.os.SystemClock.elapsedRealtime() };d.show()
+            }
     }
     override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
         if(event.actionMasked==android.view.MotionEvent.ACTION_DOWN) lastInteraction=android.os.SystemClock.elapsedRealtime()
@@ -193,6 +254,7 @@ class MainActivity : Activity() {
         val modeRow = LinearLayout(this).apply { gravity = android.view.Gravity.CENTER; setPadding(dp(16), 0, dp(16), 0) }
         conversationButton = button("대화") { languageMode = languageMode.copy(interpreting = false); saveLanguageMode() }
         modeButton = button("통역") {
+            if(funModes.mode=="practice")endFunMode()
             if (store.elevenLabs() == null) { screen.showNotice("ElevenLabs 등록 후 사용할 수 있습니다."); return@button }
             languageMode = languageMode.copy(interpreting = true); saveLanguageMode()
         }
@@ -222,6 +284,11 @@ class MainActivity : Activity() {
         refreshBatteryStatus()
         root.addView(modeRow, LinearLayout.LayoutParams(-1, dp(48)))
         root.addView(languageRow, LinearLayout.LayoutParams(-1, dp(48)))
+        funStatus=button { if(funModes.mode=="practice")showPracticeControls() else showHunt() }.apply { textSize=11f }
+        funStatus.setOnClickListener { if(!recording) { stopContinuous(false); if(funModes.mode=="practice")showPracticeControls() else showHunt() } }
+        paintButton(funStatus,false)
+        root.addView(funStatus,LinearLayout.LayoutParams(-1,dp(32)).apply { leftMargin=dp(16);rightMargin=dp(16) })
+        refreshFunStatus()
         root.addView(screen, LinearLayout.LayoutParams(-1, 0, 1f))
         clockStatus = Button(this).apply {
             textSize = 12f; isAllCaps = false; gravity = android.view.Gravity.CENTER
@@ -398,7 +465,8 @@ class MainActivity : Activity() {
             UiText.text(this,"알람·타이머","アラーム・タイマー","Alarms & timers"),
             UiText.text(this,"화면 자동 꺼짐","画面の自動消灯","Screen timeout"),
             UiText.text(this,"일정·약속 리마인더","予定リマインダー","Appointment reminders"),
-            UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"))
+            UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"),
+            funText("반응하는 아바타","アバターの動き","Reactive avatar"),funText("카메라 보물찾기","カメラ宝探し","Camera treasure hunt"),funText("한·일·영 회화 파트너","韓・日・英 会話パートナー","Conversation partner"))
         quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 기능", "クイック機能", "Quick actions"))
             .setItems(labels) { _, which ->
                 when (which) {
@@ -415,6 +483,10 @@ class MainActivity : Activity() {
                     10 -> showScreenTimeoutSettings()
                     11 -> if (!BuildConfig.DEMO) showClockPanel(ClockCommand("reminder"))
                     12 -> showDeskClockSettings()
+                    13 -> controls=AlertDialog.Builder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
+                        .setSingleChoiceItems(arrayOf(funText("켜기","オン","On"),funText("끄기","オフ","Off")),if(getSharedPreferences("gadget_ui",MODE_PRIVATE).getBoolean("reactive_avatar",true))0 else 1){d,index->getSharedPreferences("gadget_ui",MODE_PRIVATE).edit().putBoolean("reactive_avatar",index==0).apply();screen.invalidateAvatar();d.dismiss()}.show()
+                    14 -> if (!BuildConfig.DEMO) showHunt()
+                    15 -> if (!BuildConfig.DEMO) choosePractice()
                     4, 5, 6 -> startActivity(Intent(this, LibraryActivity::class.java).putExtra("mode", when(which) { 4 -> 1; 6 -> 2; else -> 0 }))
                     0, 1 -> startActivity(Intent(this, CameraActivity::class.java).putExtra("translate_photo", which == 0))
                     2 -> showComposer(UiText.text(this, "지금까지 대화의 핵심을 한국어로 짧게 요약해 줘.", "これまでの会話の要点を日本語で短くまとめて。", "Briefly summarize the key points of our conversation in English."), true)
@@ -465,6 +537,7 @@ class MainActivity : Activity() {
 
     private fun refreshLanguageControls() {
         refreshBatteryStatus()
+        refreshFunStatus()
         refreshQuickControls()
         conversationButton.text = tr("대화"); modeButton.text = tr("통역")
         displayLanguageButton.text = "${UiText.language(this).flag} ⌄"
@@ -641,7 +714,7 @@ class MainActivity : Activity() {
         if (done) {
             sending = false; turnTimeout?.cancel(); updateStatus("REPLY RECEIVED")
             if (current.replies.getValue(id).isBlank() && continuous) { stopContinuous(); return }
-            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else "ko")
+            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else if(funModes.mode=="practice")funModes.language.code!! else "ko")
             else {
                 releaseScreenAwake()
                 if (continuous) scheduleListening()
@@ -831,6 +904,7 @@ class MainActivity : Activity() {
     }
 
     private fun startCapture(automatic: Boolean) {
+        if(funModes.mode=="practice" && store.elevenLabs()==null){screen.showNotice(funText("음성 회화 연습에는 ElevenLabs 음성 인식 설정이 필요합니다. 키보드로도 연습할 수 있습니다.","音声練習にはElevenLabsの設定が必要です。文字でも練習できます。","Voice practice needs ElevenLabs speech recognition. You can also practice with the keyboard."));return}
         if (!historyLoaded || recording || languageDialog?.isShowing == true || controls?.isShowing == true || clearDialog?.isShowing == true) return
         if (!connected || sending) {
             if (!connected) screen.showNotice(if (store.credentials() == null) "Pair this r1 with Muse on your phone first."
@@ -932,9 +1006,9 @@ class MainActivity : Activity() {
                     ensureActive()
                     if (connection !== current || turn != thisTurn) return@launch
                     receiveTranscript(text)
-                    if (handleLocalClock(text, true)) return@launch
+                    if (funModes.mode!="practice" && handleLocalClock(text, true)) return@launch
                     updateStatus("MUSE에 전송 중")
-                    withContext(Dispatchers.IO) { checkNotNull(current).sendText(activeLanguageMode.message(text)) }
+                    withContext(Dispatchers.IO) { checkNotNull(current).sendText(if(funModes.mode=="practice") practicePayload(text) else activeLanguageMode.message(text)) }
                 } else {
                     val userId = withContext(Dispatchers.IO) { checkNotNull(current).sendVoice(wav) }
                     if (connection === current && turn == thisTurn && transcriptPending) fetchTranscript(current!!, userId, thisTurn)
@@ -999,7 +1073,7 @@ class MainActivity : Activity() {
     }
 
     private fun sendTypedMessage(message: String, plainConversation: Boolean = false) {
-        if (!plainConversation && handleLocalClock(message, false)) return
+        if (funModes.mode!="practice" && !plainConversation && handleLocalClock(message, false)) return
         val current = connection ?: return
         activeLanguageMode = if (plainConversation) languageMode.copy(interpreting = false) else languageMode
         localTranscript = true
@@ -1009,7 +1083,7 @@ class MainActivity : Activity() {
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "Muse에 전송 중", "Museに送信中", "Sending to Muse"))
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val payload = activeLanguageMode.message(message)
+        val payload = if(funModes.mode=="practice" && !plainConversation) practicePayload(message) else activeLanguageMode.message(message)
         sendJob = scope.launch {
             try { withContext(Dispatchers.IO) { current.sendText(payload) } }
             catch (error: Exception) {
@@ -1058,7 +1132,7 @@ class MainActivity : Activity() {
     }
 
     private fun startVoiceTurn() {
-        activeLanguageMode = languageMode
+        activeLanguageMode = if(funModes.mode=="practice")languageMode.copy(interpreting=false,input=funModes.language) else languageMode
         localTranscript = store.elevenLabs() != null
         replySpeechStopped=false
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { history.add(it) }

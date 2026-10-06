@@ -28,6 +28,8 @@ internal class MuseScreen(
     onControls: () -> Unit,
     onClearHistory: () -> Unit = {},
 ) : FrameLayout(context) {
+    fun setCharging(value:Boolean){avatar.charging=value;avatar.invalidate()}
+    fun invalidateAvatar(){avatar.invalidate()}
     private val background = Color.rgb(10, 11, 10)
     private val cream = Color.rgb(242, 233, 221)
     private val muted = Color.rgb(162, 154, 142)
@@ -588,6 +590,7 @@ internal class MuseScreen(
     }
 
     private inner class Character(context: Context) : View(context) {
+        var charging = false
         var compact = 0f
         var phase = Phase.QUIET
             set(value) { field = value; invalidate() }
@@ -643,7 +646,14 @@ internal class MuseScreen(
             // Preserve the whole dolphin, with extra breathing room in conversation mode.
             source.set(0, 0, bitmap.width, bitmap.height)
             canvas.save()
-            val avatarScale = .85f + .07f * compact
+            val animate=preferences.getBoolean("reactive_avatar",true) && ValueAnimator.areAnimatorsEnabled()
+            if(animate) {
+                val tilt=when(phase){Phase.LISTENING->(sin(clock*2)*5).toFloat();Phase.THINKING->(sin(clock*1.6)*3).toFloat();else->0f}
+                canvas.rotate(tilt,width/2f,height/2f)
+                val bob=when(phase){Phase.SPEAKING->(sin(clock*8)*height*.018).toFloat();Phase.QUIET->(sin(clock*1.5)*height*.012).toFloat();else->0f}
+                canvas.translate(0f,bob)
+            }
+            val avatarScale = (.85f + .07f * compact) * (if(animate && phase==Phase.LISTENING)1.025f else 1f)
             canvas.scale(avatarScale, avatarScale, width / 2f, height / 2f)
             canvas.drawBitmap(bitmap, source, image, paint)
             canvas.restore()
@@ -656,7 +666,11 @@ internal class MuseScreen(
                         dp(2).toFloat(), dp(2).toFloat(), paint)
                 }
             }
-            if (phase != Phase.QUIET && isShown) postInvalidateOnAnimation()
+            if(animate && charging && phase==Phase.QUIET){
+                paint.color=orange;paint.alpha=(110+pulse*100).toInt();paint.textSize=dp(13).toFloat()
+                canvas.drawText("ϟ",width*.82f,height*.30f,paint);paint.alpha=255
+            }
+            if (isShown && windowVisibility == View.VISIBLE && (phase != Phase.QUIET || animate)) postInvalidateDelayed(33)
         }
     }
 }

@@ -27,6 +27,10 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 - [Build, verification and demo capture](docs/development.md)
 - [Privacy and security](SECURITY.md) · [Credits and asset license](CREDITS.md)
 
+## Latest on main
+
+Reactive avatar controls, a camera treasure hunt, Korean/Japanese/English conversation practice, and a configurable charging-clock idle delay (10 seconds to 5 minutes; default 20 seconds). See the language guides for use and validation limits. These source additions do not replace the existing V1.5 release tag or its demo screenshots.
+
 ## New in V1.5
 
 Side-button speech interruption, local appointment reminders, home battery and clock status, speech-following conversation scroll, screen-awake control, and a charging desk clock with weekday, weather icons, humidity and hourly UV forecasts. [Release notes — EN / KO / JA](docs/RELEASE-V1.5.md).

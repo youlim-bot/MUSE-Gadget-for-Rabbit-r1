@@ -95,3 +95,7 @@ Publication lint: 15 existing errors / 38 warnings; no lint findings in the new 
 ### Recreate V1.5 sharing assets
 
 After building and installing the separate demo APK on an authorized r1, run `python3 scripts/capture-demo.py`. It checks demo ownership and the expected clock/reminder scenes before capturing. Then run `python3 scripts/make-showcase.py` in a Python environment with Pillow installed. It writes the overview sheets into `docs/images` and the Discord kit into the ignored `build` directory. Only use fictional demo content for public captures.
+
+## Post-V1.5 source update
+
+Normal/demo builds and 94 JVM tests pass for the reactive avatar, treasure hunt, conversation partner and configurable clock delay additions. Native menu checks and a 10-second clock transition were performed on the private development build. No live photo judgment or Muse practice response was requested during these checks. Existing V1.5 screenshot fixtures remain unchanged.

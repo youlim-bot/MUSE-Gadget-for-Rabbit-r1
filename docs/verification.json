@@ -35,5 +35,22 @@
     "Home battery state displayed on R1"
   ],
   "scope": "Publication checks build the public source and capture fixture UI. Earlier development checks used the private build; they do not constitute a new full public-build end-to-end test.",
-  "android_test_apk_build": "passed"
+  "android_test_apk_build": "passed",
+  "latest_main_update": {
+    "features": [
+      "reactive avatar",
+      "camera treasure hunt",
+      "conversation partner",
+      "configurable clock idle delay"
+    ],
+    "normal_and_demo_build": "passed",
+    "jvm_tests": 94,
+    "jvm_failures": 0,
+    "lint_errors": {
+      "MissingPermission": 13,
+      "SuspiciousIndentation": 2
+    },
+    "live_photo_judgment_and_practice_response": "not tested",
+    "v1_5_release_tag_and_screenshots": "unchanged"
+  }
 }

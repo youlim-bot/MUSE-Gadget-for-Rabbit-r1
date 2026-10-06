@@ -203,7 +203,10 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
                 photo.visibility = View.VISIBLE; surface.visibility = View.GONE
                 capture.visibility = View.GONE; retake.visibility = View.VISIBLE; save.visibility = View.VISIBLE; save.isEnabled = true; ask.visibility = View.VISIBLE; ask.isEnabled = true
                 photoTools.visibility = View.VISIBLE; translatePhoto.isEnabled = true
-                if (intent.getBooleanExtra("translate_photo", false)) {
+                if(intent.hasExtra("hunt_prompt")) {
+                    val lang=InputLanguage.entries.firstOrNull{it.name==intent.getStringExtra("hunt_language") && it!=InputLanguage.AUTO} ?: InputLanguage.KOREAN
+                    askMuse(intent.getStringExtra("hunt_prompt"),lang)
+                } else if (intent.getBooleanExtra("translate_photo", false)) {
                     intent.removeExtra("translate_photo")
                     choosePhotoLanguage()
                 }
