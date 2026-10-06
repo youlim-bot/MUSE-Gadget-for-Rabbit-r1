@@ -34,3 +34,9 @@ MainActivity exposes the stop-voice control while SpeechOutput has queued/active
 ## V1.5 components
 
 `ReminderCommand` parses supported reminder phrases and opens `ClockPanel` for confirmation. `ClockHomeStatus` supplies the home summary. `DeskClockDialog` owns the charging display and cancels its location/weather coroutine on dismissal. `ClockWeather` requests current temperature, humidity and weather code plus hourly UV index from [Open-Meteo](https://open-meteo.com/en/docs). UV selection matches the current Unix timestamp to its hourly interval; missing values remain unknown. `SpeechTiming` maps supported speech alignment to transcript offsets; manual scrolling suspends following.
+
+## V2.0 pet and settings components
+
+`PetState` implements deterministic five-minute simulation steps, hidden incubation, needs, health, temperament, adult forms and death. `PetStore` persists the simulation in app-private preferences and archives migrations/new eggs. `PetRoom`, `PetScene` and `PetMotion` render the room, animation and mini-games. `PetAudio` and `PetSoundtrack` manage local music/effects with speech priority. Agent requests remain owned by MainActivity and the existing Muse session; the pet never receives a second credential store. `MuseSettingsDialog` groups settings and opens Android's Wi-Fi panel without handling passwords.
+
+ClockWeather now requests hourly UV plus daily maximum UV and keeps cache freshness bounded by the forecast hour. Connection diagnostics retain stage names and HTTP codes only, never tokens, response bodies or URLs. Reconnect attempts are bounded and do not silently replay an interrupted user request.

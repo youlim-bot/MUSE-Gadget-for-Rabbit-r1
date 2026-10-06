@@ -1,10 +1,10 @@
-# MUSE Gadget for Rabbit r1 — V1.5
+# MUSE Gadget for Rabbit r1 — V2.0
 
-[**V1.5 release**](https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1/releases/tag/v1.5) · [Discord image kit](https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1/releases/download/v1.5/MUSE-r1-V1.5-Discord-kit.zip)
+[**V2.0 release**](https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1/releases/tag/v2.0) · [Discord image kit](https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1/releases/download/v2.0/MUSE-r1-V2.0-Discord-kit.zip)
 
 **[English guide](docs/en/GUIDE.md) · [한국어 가이드](docs/ko/GUIDE.md) · [日本語ガイド](docs/ja/GUIDE.md)**
 
-A community Android Home app for a Rabbit r1 running LineageOS. Talk to Muse, interpret between Korean/Japanese/English, ask about photos, type messages, and keep a searchable local library.
+A community Android Home app for a Rabbit r1 running LineageOS. Talk to Muse, interpret between Korean/Japanese/English, ask about photos, type messages, keep a searchable local library, and raise a virtual companion.
 
 Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapshot [`c0dd741`](https://github.com/cameronapak/muse-r1/commit/c0dd741f0896f85540625d52be01750672e00eca). This repository contains the extended source and a documented installation journey. It is not an official Rabbit, Meta, ElevenLabs, or LineageOS project, and it is **not a custom ROM**.
 
@@ -14,7 +14,7 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
   <img src="docs/images/en-tasks.png" width="230" alt="Local checklist with fictional sample data">
 </p>
 
-**Screenshots:** actual Android views captured on an r1 using a separate offline demo package. All conversations, translations, photo answers and tasks are fixtures, not live AI results. The demo has no Internet, microphone or camera permission. [Gallery and Discord captions](docs/SHOWCASE.md).
+**Screenshots:** actual Android views captured on a disposable 480×640 emulator using a separate offline demo package. All conversations, translations, photo answers and tasks are fixtures, not live AI results. The demo has no Internet, microphone or camera permission. [Gallery and Discord captions](docs/SHOWCASE.md).
 
 ## Start here
 
@@ -27,21 +27,27 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 - [Build, verification and demo capture](docs/development.md)
 - [Privacy and security](SECURITY.md) · [Credits and asset license](CREDITS.md)
 
-## Latest on main
+## New in V2.0 — Raise your Muse
 
-Wi-Fi/mobile signal indicators now share the battery status row, and activity banners no longer clip their text.
+An animated egg becomes a companion over days. Feed, play, care and talk together: your choices shape its personality and adult form. A dedicated pet-room interface keeps Muse's agent controls within reach. Local care and music work offline; assistant answers still need Muse connectivity.
 
-Reactive avatar controls, a camera treasure hunt, Korean/Japanese/English conversation practice, and a configurable charging-clock idle delay (10 seconds to 5 minutes; default 20 seconds). See the language guides for use and validation limits. These source additions do not replace the existing V1.5 release tag or its demo screenshots.
+- Six foods, three mini-games, sleep, cleaning and medicine; neglect has consequences.
+- Hidden growth requirements, multiple life stages and branching adult forms.
+- Three local BGM choices, growth-aware Auto, birdlike effects and speech priority.
+- Custom dolphin avatar generated with Muse, without a reference image, as reported by the project owner.
+- A dedicated Settings menu, reorganized quick actions and Camera → Keyboard → Quick actions → Sound → Settings toolbar.
+- Current/peak UV clarity, network status, bounded reconnection and re-pairing guidance.
+- Reactive avatar, camera treasure hunt and Korean/Japanese/English conversation practice.
 
-## New in V1.5
-
-Side-button speech interruption, local appointment reminders, home battery and clock status, speech-following conversation scroll, screen-awake control, and a charging desk clock with weekday, weather icons, humidity and hourly UV forecasts. [Release notes — EN / KO / JA](docs/RELEASE-V1.5.md).
+[**V2.0 release notes — English / 한국어 / 日本語**](docs/RELEASE-V2.0.md)
 
 <p align="center">
-  <img src="docs/images/en-clock.png" width="230" alt="V1.5 charging clock with fictional weather">
-  <img src="docs/images/en-alarms.png" width="230" alt="V1.5 local reminder example">
-  <img src="docs/images/en-home.png" width="230" alt="V1.5 home battery and reminder status">
+  <img src="docs/images/en-pet-egg.png" width="230" alt="V2.0 egg — offline demo">
+  <img src="docs/images/en-pet-adult.png" width="230" alt="V2.0 grown companion — simulated age">
+  <img src="docs/images/en-pet-agent.png" width="230" alt="Muse agent inside pet mode — fictional response">
 </p>
+
+Alarms, timers, appointment reminders, speech-following scroll and the weather desk clock remain included from [V1.5](docs/RELEASE-V1.5.md). Navigation remains removed.
 
 ## Features
 
@@ -88,9 +94,9 @@ Keep your signing key stable. `install -r` preserves data only when Android acce
 
 ## Verification boundaries
 
-This is a community prototype tested on one LineageOS 21 / Android 14 Rabbit r1. The feature build passed 78 JVM tests and was installed with credentials preserved. The public export is built/tested separately; see [current checks](docs/development.md#public-export-checks). Photos and memo extraction still need end-to-end quality checks against your own Muse account. Camera front/back selection physically rotated the owner's unit; wheel behavior needs hands-on verification. Continuous interpretation is turn-based, not simultaneous streaming translation.
+The app was developed on a LineageOS 21 / Android 14 Rabbit r1. V2.0 public-source checks and emulator captures are listed in [verification](docs/verification.json). These captures do not demonstrate live assistant replies, physical camera rotation, outdoor weather accuracy or recovered pairing. Pet time is simulated for lifecycle tests; real multi-day observation remains separate. Continuous interpretation is turn-based, not simultaneous streaming translation.
 
-Firmware flashing wipes data and may prevent booting. Follow the guide's firmware/slot/fastbootd checks; never apply this unit's recovery state to another unit. Firmware images, stock backups, identifiers, credentials, personal screenshots and private avatar images are excluded.
+Firmware flashing wipes data and may prevent booting. Follow the guide's firmware/slot/fastbootd checks; never apply this unit's recovery state to another unit. Firmware images, stock backups, identifiers, credentials, personal screenshots and personal data are excluded.
 
 한국어: LineageOS 설치부터 Muse 연결, 한국어·일본어·영어 통역, 사진 질문, 키보드, 메모·할 일까지 정리한 커뮤니티 프로젝트입니다. 위의 한국어 가이드에서 설치와 사용법을 확인하세요.
 
@@ -98,4 +104,4 @@ Firmware flashing wipes data and may prevent booting. Follow the guide's firmwar
 
 ## License
 
-First-party code/docs: [MIT](LICENSE), preserving Cameron Pak's notice. Vendored protocol and cryptography files retain their own licenses and provenance. The public build restores the original upstream Muse r1 avatar; the illustration is not covered by the code MIT license. Private dolphin/reference images are not distributed. See [CREDITS](CREDITS.md).
+First-party code/docs: [MIT](LICENSE), preserving Cameron Pak's notice. Vendored protocol and cryptography files retain their own licenses and provenance. V2.0 uses the owner-provided Muse-generated dolphin in both conversation and pet views. Artwork is excluded from the code MIT license; this repository does not establish exclusive copyright or independently verify the generating service’s output terms. Original upstream character artwork is removed from the current tree. See [CREDITS](CREDITS.md).

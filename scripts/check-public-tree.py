@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 root = Path(__file__).resolve().parents[1]
-files = [root / p for p in subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0') if p]
+files = [root / p for p in subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0') if p and (root / p).is_file()]
 problems = []
 for p in files:
     rel = p.relative_to(root).as_posix()
@@ -15,7 +15,7 @@ for p in files:
         text = p.read_text()
     except (UnicodeDecodeError, OSError):
         continue
-    patterns = [r'gh[pousr]_[A-Za-z0-9]{30,}',r'github_pat_[A-Za-z0-9_]{30,}',r'sk-[A-Za-z0-9]{24,}',r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',r'/' + 'Users' + r'/[^/\s]+/',r'/' + 'Volumes' + r'/[^/\s]+/']
+    patterns = [r'AIza[0-9A-Za-z_-]{35}',r'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}',r'gh[pousr]_[A-Za-z0-9]{30,}',r'github_pat_[A-Za-z0-9_]{30,}',r'sk-[A-Za-z0-9]{24,}',r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',r'/' + 'Users' + r'/[^/\s]+/',r'/' + 'Volumes' + r'/[^/\s]+/']
     # This scanner's pattern definitions contain path prefixes but no actual user paths.
     for pattern in patterns:
         if re.search(pattern,text):problems.append((rel,'possible secret or local personal path'))

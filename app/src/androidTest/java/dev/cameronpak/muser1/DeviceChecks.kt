@@ -35,6 +35,9 @@ import kotlin.math.sin
 
 /** Local hardware checks. No Muse network calls or account credentials are fabricated. */
 class DeviceChecks : Instrumentation() {
+    private var petDemo=false
+    private var petLifecycle=false
+    private var connectionRecovery=false
     private var reminderUi = false
     private var additions = false
     private var screenTimeout = false
@@ -55,6 +58,9 @@ class DeviceChecks : Instrumentation() {
     private var expectedTranscript = "Please say the words Muse on Rabbit is working and nothing else."
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        petDemo=arguments?.getString("petDemo")=="true"
+        petLifecycle=arguments?.getString("petLifecycle")=="true" || petDemo
+        connectionRecovery=arguments?.getString("connectionRecovery")=="true"
         reminderUi = arguments?.getString("reminderUi") == "true"
         additions = arguments?.getString("additions") == "true"
         screenTimeout = arguments?.getString("screenTimeout") == "true"
@@ -78,6 +84,8 @@ class DeviceChecks : Instrumentation() {
     override fun onStart() {
         val result = Bundle()
         try {
+            if(petLifecycle) { PetLifecycleCheck.run(this,result,petDemo);finish(Activity.RESULT_OK,result);return }
+            if(connectionRecovery) { ConnectionRecoveryCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if (additions || reminderUi) { AdditionsCheck.run(this,result,reminderUi);finish(Activity.RESULT_OK,result);return }
             if (screenTimeout) { ScreenTimeoutCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if (readingCheck) { ReadingCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
@@ -129,7 +137,7 @@ class DeviceChecks : Instrumentation() {
             result.putString("stream", "PASS: side-button service hold starts recording; nonzero 16kHz PCM captured; WAV lengths match; audio playback completed. No audio sent to Muse.")
             finish(Activity.RESULT_OK, result)
         } catch (error: Exception) {
-            val detail = if (reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
+            val detail = if (petLifecycle || reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
             result.putString("stream", result.getString("stream", "") + "FAIL: " + error.javaClass.simpleName + detail)
             finish(Activity.RESULT_CANCELED, result)
         }
@@ -144,7 +152,7 @@ class DeviceChecks : Instrumentation() {
         val connection = MuseConnection(credentials, store.sdkToken(), store::save, { lastStatus = it }, { id, text, done ->
             texts.compute(id) { _, before -> if (done && text.isNotBlank()) text else before.orEmpty() + text }
             if (done) reply.countDown()
-        })
+        }, refreshDeviceId=store.identity.nodeId)
         try {
             runBlocking {
                 connection.connect()
@@ -978,7 +986,7 @@ class DeviceChecks : Instrumentation() {
             touchAvatar.performClick() // Accessibility click also reaches device controls.
             check(tapControls == 2)
         }
-        val asset = BitmapFactory.decodeResource(targetContext.resources, R.drawable.muse_character)
+        val asset = BitmapFactory.decodeResource(targetContext.resources, R.drawable.muse_dolphin)
         val pixels = IntArray(asset.width * asset.height)
         asset.getPixels(pixels, 0, asset.width, 0, 0, asset.width, asset.height)
         val backgrounds = Bitmap.createBitmap(asset.width * 2, asset.height, Bitmap.Config.ARGB_8888)
@@ -1008,7 +1016,7 @@ class DeviceChecks : Instrumentation() {
         val fetch = MainActivity::class.java.getDeclaredMethod("fetchTranscript", MuseConnection::class.java,
             String::class.java, Long::class.javaPrimitiveType).apply { isAccessible = true }
         // Empty credentials and an unopened connection: these fixtures cannot send a network request.
-        val offline = MuseConnection(DeviceCredentials("offline-fixture", "", ""), null, {}, {}, { _, _, _ -> })
+        val offline = MuseConnection(DeviceCredentials("offline-fixture", "", ""), null, {}, {}, { _, _, _ -> }, refreshDeviceId="offline-fixture")
         runOnMainSync {
             field("connection").set(activity, offline)
             @Suppress("UNCHECKED_CAST")

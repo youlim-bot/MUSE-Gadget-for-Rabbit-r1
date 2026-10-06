@@ -2,6 +2,23 @@
 
 [English](GUIDE.md) · [한국어](../ko/GUIDE.md) · [日本語](../ja/GUIDE.md) · [Home](../../README.md)
 
+## V2.0 — Raise your Muse
+
+Open **Quick actions → Raise Muse** to enter a dedicated virtual-pet room. The companion starts as an animated egg and grows over days, including time away from the app. The interface deliberately hides exact hatching requirements and growth thresholds. Care choices influence temperament and the eventual adult form; extended neglect can cause illness and death. A new egg archives the previous local pet record.
+
+After hatching, choose from six foods (milk, porridge, berries, fish, vegetables and cake), three mini-games (star catching, light memory and bird rhythm), cleaning, medicine and sleep. Repeated actions have cooldowns; growth is not an instant tap-to-level checklist. Adult forms share the custom dolphin base with different accessories and behavior.
+
+The **♫** control offers Auto, Forest, Music box, Garden and Off, with separate sound effects. Auto changes the soundtrack with growth and sleep. Speech/recording and audio-focus changes take priority over pet audio.
+
+Muse remains your assistant inside the pet room: use Talk, Type or Tools without leaving the mode. Successful assistant interactions contribute to care. **Local pet care, motion and music work offline; Muse answers and cloud speech still need a valid connection.** An offline room is not proof that pairing has recovered.
+
+The bottom toolbar is now **Camera → Keyboard → Quick actions → Sound → Settings**. Settings groups Wi-Fi, pairing/side-button controls, text size, voice speed, volume, screen timeout, charging-clock delay, avatar motion and display language. Wi-Fi passwords stay in Android's system panel, opened from Muse.
+
+Weather distinguishes **UV now** from **today's peak UV**, marks nighttime, preserves missing readings as unknown, and refreshes when the weather area is tapped. Connection recovery has bounded retries and a re-pairing notice; it cannot restore revoked pairing without the supported phone flow. Navigation remains removed.
+
+[Trilingual V2.0 release notes](../RELEASE-V2.0.md) · [Offline screenshot gallery](../SHOWCASE.md)
+
+
 ## 1. Scope and prerequisites
 
 This records one Rabbit r1 installation, not an official device support promise. The tested system is **LineageOS 21 / Android 14, `lineage-21.0-20250621-UNOFFICIAL-arm64_bgN`**. The original vendor/kernel remain; this project builds an Android app, not firmware.
@@ -175,7 +192,7 @@ For poor recognition, compare the exact spoken and recognized phrase, allow micr
 | Search | Searches locally displayed questions/answers and saved items; space-separated terms must all match. It does not search all remote Muse history. |
 | Voice memo | Quick actions → Voice memos → Record (up to 20s) → transcribe with ElevenLabs → edit/save text locally. No audio archive and no automatic Muse submission. |
 | Memo to tasks | Open saved memo → Make to-dos → confirm sending memo to Muse → review one task per line → Save list. Up to 50 tasks; original memo remains. Completion checks persist. No reminders/calendar integration. |
-| Avatar | This public build uses the original upstream Muse r1 avatar (see the artwork notice in CREDITS). The owner's custom dolphin was a local image adaptation, not automatic account-avatar synchronization. Replace the drawable only with an asset you can distribute. |
+| Avatar | V2.0 uses the owner-provided Muse-generated dolphin in conversation and pet views. See CREDITS for the separate artwork notice. Account-avatar automatic synchronization is not implemented. |
 
 ## 9. LTE and troubleshooting
 
@@ -208,7 +225,7 @@ During speech preparation/playback, the bottom Quick actions button becomes **�
 - **Charging desk clock:** enable it in Quick actions. After the selected idle delay while plugged in (20 seconds by default), Muse shows time, date/weekday, local weather icon, temperature, humidity and hourly forecast UV index. Tap to return. Display language follows English/Korean/Japanese settings. Weather uses approximate rounded coordinates with Open-Meteo; initial Android location approval and internet access are required. Missing values show a dash; weather failure does not stop the clock. Location is requested only while this screen is open, and weather refreshes every 15 minutes. No location history is stored.
 - **Reading and screen controls:** conversation wheel scrolling stays inside the transcript; supported speech timestamps follow the spoken passage. Manual scrolling pauses following, and the down-arrow resumes it. Android TTS depends on engine range callbacks; unsupported cloud timestamp responses fall back to audio without precise tracking. Bold Markdown renders without literal `**`. Quick actions can keep the Muse screen awake; this is an app preference, not a global Android timeout change.
 
-The gallery uses the original Muse avatar and fictional offline examples. Sample City, weather numbers, battery level and reminders in screenshots are fixtures. This release does not include navigation or Google Maps integration.
+The V2.0 gallery uses the custom dolphin and fictional offline examples. Sample City, weather numbers, battery level and reminders in screenshots are fixtures. This release does not include navigation or Google Maps integration.
 
 ## Latest source additions
 

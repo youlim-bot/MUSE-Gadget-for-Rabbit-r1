@@ -37,6 +37,7 @@ class MainActivity : Activity() {
     private var recording = false
     private var sending = false
     private var pairingRequested = false
+    private var repairPairingRequested = false
     private var pairingWindow: Job? = null
     private var turnTimeout: Job? = null
     private var transcriptFetch: Job? = null
@@ -47,6 +48,9 @@ class MainActivity : Activity() {
     private var quickDialog: AlertDialog? = null
     private lateinit var quietButton: android.widget.ImageButton
     private lateinit var quickButton: Button
+    private lateinit var settingsButton: android.widget.ImageButton
+    private var settingsDialog:MuseSettingsDialog?=null
+    private var returnToSettings=false
     private var quietMode = false
     private var replySpeechStopped=false
     private var stopControlVisible=false
@@ -339,7 +343,7 @@ class MainActivity : Activity() {
                 startActivity(Intent(this@MainActivity, CameraActivity::class.java))
             }
         }
-        cameraBar.addView(cameraButton, android.widget.FrameLayout.LayoutParams(dp(48), dp(48), android.view.Gravity.END).apply { rightMargin = dp(12) })
+        cameraBar.addView(cameraButton, android.widget.FrameLayout.LayoutParams(dp(48), dp(48), android.view.Gravity.START).apply { leftMargin = dp(12) })
         val keyboardButton = android.widget.ImageButton(this).apply {
             setImageResource(R.drawable.ic_keyboard)
             contentDescription = UiText.text(this@MainActivity, "글로 대화", "文字で会話", "Type a message")
@@ -352,7 +356,16 @@ class MainActivity : Activity() {
             background = android.graphics.drawable.InsetDrawable(circle, dp(8))
             setOnClickListener { showComposer() }
         }
-        cameraBar.addView(keyboardButton, android.widget.FrameLayout.LayoutParams(dp(48), dp(48), android.view.Gravity.START).apply { leftMargin = dp(12) })
+        cameraBar.addView(keyboardButton, android.widget.FrameLayout.LayoutParams(dp(48), dp(48), android.view.Gravity.START).apply { leftMargin = dp(60) })
+        settingsButton=android.widget.ImageButton(this).apply {
+            setImageResource(R.drawable.ic_settings);contentDescription=funText("설정","設定","Settings")
+            minimumWidth=0;minimumHeight=0;setPadding(0,0,0,0);elevation=0f;stateListAnimator=null
+            background=android.graphics.drawable.InsetDrawable(android.graphics.drawable.GradientDrawable().apply {
+                shape=android.graphics.drawable.GradientDrawable.OVAL;setColor(android.graphics.Color.rgb(255,139,66))
+            },dp(8))
+            setOnClickListener { showSettingsMenu() }
+        }
+        cameraBar.addView(settingsButton,android.widget.FrameLayout.LayoutParams(dp(48),dp(48),android.view.Gravity.END).apply{rightMargin=dp(12)})
         quietMode = getSharedPreferences("reply_options", MODE_PRIVATE).getBoolean("quiet", false)
         quickButton = Button(this).apply {
             textSize = 12f; isAllCaps = false; minWidth = 0; minimumWidth = 0
@@ -464,6 +477,43 @@ class MainActivity : Activity() {
         if(continuous && !sending && !recording)scheduleListening()
     }
 
+    private var petRoom:PetRoom?=null
+    private val inPetMode get()=petRoom?.isShowing==true
+    private var petRewardedTurn:ConversationTurn?=null
+    private var activePetTurn=false
+    private fun showPetRoom() {
+        if(recording || sending || petRoom!=null)return
+        stopContinuous(false);speech.stop();closeDeskClock()
+        val room=PetRoom(this);petRoom=room
+        room.setOnDismissListener { petRoom=null;lastInteraction=android.os.SystemClock.elapsedRealtime() }
+        room.show()
+    }
+    internal fun petType() { showComposer(plainConversation=true) }
+    internal fun petTools() { showQuickQuestions() }
+    internal fun petStopSpeech() { stopReplySpeech() }
+    internal fun petRefresh() {
+        val current=activeTurn ?: history.lastOrNull()
+        val text=current?.let { listOf(it.user.orEmpty(), it.replies.values.joinToString("\n\n")).filter { part -> part.isNotBlank() }.joinToString("\n\n") }
+        petRoom?.agentUpdate(if(connected)funText("Muse 연결됨","Muse接続済み","Muse connected") else funText("연결 안 됨 · 눌러 재연결","未接続 · タップで再接続","Offline · Tap to reconnect"),
+            text?.takeIf { it.isNotBlank() }?.let { it.replace("**", "") } ?: funText("Muse에게 질문하거나 일을 부탁해 보세요.","Museに質問やお願いをしてみましょう。","Ask Muse a question or give it a task."))
+    }
+    internal fun petReconnect() {
+        if(connected || sending || recording)return
+        disconnect();connect();petRoom?.agentUpdate(funText("Muse 연결 중…","Museに接続中…","Connecting to Muse…"))
+    }
+    internal fun petBeginVoice():Boolean {
+        if(petRoom?.hasWindowFocus()!=true || getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked)return false
+        if(!connected || sending || recording || !historyLoaded) {
+            petRoom?.agentUpdate(funText("연결 또는 응답을 기다려 주세요","接続・応答をお待ちください","Wait for connection or reply"),reveal=true);return false
+        }
+        petRoom?.muteAudio()
+        stopContinuous(false);stopReplySpeech();beginRecording();sideButtonRecording=recording
+        return recording
+    }
+    internal fun petEndVoice(send:Boolean) { finishRecording(send) }
+    internal val petAudioBlocked get()=recording || sending || speech.hasPlayback
+
+
     private fun showQuickQuestions() {
         if (recording || sending || quickDialog != null || composer != null) return
         stopContinuous(); speech.stop()
@@ -481,10 +531,21 @@ class MainActivity : Activity() {
             UiText.text(this,"화면 자동 꺼짐","画面の自動消灯","Screen timeout"),
             UiText.text(this,"일정·약속 리마인더","予定リマインダー","Appointment reminders"),
             UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"),
-            funText("반응하는 아바타","アバターの動き","Reactive avatar"),funText("카메라 보물찾기","カメラ宝探し","Camera treasure hunt"),funText("한·일·영 회화 파트너","韓・日・英 会話パートナー","Conversation partner"))
+            funText("반응하는 아바타","アバターの動き","Reactive avatar"),funText("카메라 보물찾기","カメラ宝探し","Camera treasure hunt"),funText("한·일·영 회화 파트너","韓・日・英 会話パートナー","Conversation partner"),
+            funText("뮤즈 키우기","Museを育てる","Raise Muse"))
+        // Display order is separate from action IDs so reordered rows retain their behavior.
+        val actionOrder = listOf(
+            9, 11, 6,       // Daily tools: alarms, reminders, voice memos.
+            0, 1, 7,        // Photo translation, questions, follow-up.
+            2, 3, 4, 5,     // Conversation helpers and saved history.
+            16, 15, 14      // Pet room, practice and play. Preferences live in Settings.
+        )
+        val orderedLabels = actionOrder.map { labels[it] }.toTypedArray()
         quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 기능", "クイック機能", "Quick actions"))
-            .setItems(labels) { _, which ->
+            .setItems(orderedLabels) { _, position ->
+                val which = actionOrder[position]
                 when (which) {
+                    16 -> showPetRoom()
                     7 -> {
                         val photo = PhotoQuestion.last
                         if (photo == null) screen.showNotice(UiText.text(this, "먼저 사진을 찍어 Muse에 보내 주세요. 앱이 종료되면 사진은 기억하지 않습니다.", "先に写真をMuseに送ってください。アプリ終了後は写真を保持しません。", "Send a photo first. Photos are not retained after the app process ends."))
@@ -494,14 +555,14 @@ class MainActivity : Activity() {
                             }.show()
                     }
                     8 -> showReadingSettings()
-                    9 -> if (!BuildConfig.DEMO) showClockPanel()
+                    9 -> showClockPanel()
                     10 -> showScreenTimeoutSettings()
-                    11 -> if (!BuildConfig.DEMO) showClockPanel(ClockCommand("reminder"))
+                    11 -> showClockPanel(ClockCommand("reminder"))
                     12 -> showDeskClockSettings()
                     13 -> controls=AlertDialog.Builder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
                         .setSingleChoiceItems(arrayOf(funText("켜기","オン","On"),funText("끄기","オフ","Off")),if(getSharedPreferences("gadget_ui",MODE_PRIVATE).getBoolean("reactive_avatar",true))0 else 1){d,index->getSharedPreferences("gadget_ui",MODE_PRIVATE).edit().putBoolean("reactive_avatar",index==0).apply();screen.invalidateAvatar();d.dismiss()}.show()
-                    14 -> if (!BuildConfig.DEMO) showHunt()
-                    15 -> if (!BuildConfig.DEMO) choosePractice()
+                    14 -> showHunt()
+                    15 -> choosePractice()
                     4, 5, 6 -> startActivity(Intent(this, LibraryActivity::class.java).putExtra("mode", when(which) { 4 -> 1; 6 -> 2; else -> 0 }))
                     0, 1 -> startActivity(Intent(this, CameraActivity::class.java).putExtra("translate_photo", which == 0))
                     2 -> showComposer(UiText.text(this, "지금까지 대화의 핵심을 한국어로 짧게 요약해 줘.", "これまでの会話の要点を日本語で短くまとめて。", "Briefly summarize the key points of our conversation in English."), true)
@@ -517,6 +578,80 @@ class MainActivity : Activity() {
     private fun releaseScreenAwake() {
         if (keepScreenAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun wifiSettingsSummary():String {
+        if(BuildConfig.DEMO)return "Offline demo · Sample Wi-Fi"
+        val wifi=getSystemService(android.net.wifi.WifiManager::class.java)
+        if(!wifi.isWifiEnabled)return funText("꺼짐 · 눌러 연결","オフ · タップして接続","Off · Tap to connect")
+        val cm=getSystemService(android.net.ConnectivityManager::class.java)
+        val caps=cm.allNetworks.mapNotNull { cm.getNetworkCapabilities(it) }
+            .firstOrNull { it.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) && it.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) }
+        return when {
+            caps==null->funText("연결되지 않음 · 네트워크 선택","未接続 · ネットワークを選択","Not connected · Choose a network")
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)->funText("연결됨 · 인터넷 사용 가능","接続済み · インターネット利用可","Connected · Internet available")
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)->funText("Wi-Fi 연결됨 · 로그인 필요","Wi-Fi接続済み · ログインが必要","Wi-Fi connected · Sign-in needed")
+            else->funText("Wi-Fi 연결됨 · 인터넷 미확인","Wi-Fi接続済み · インターネット未確認","Wi-Fi connected · Internet unconfirmed")
+        }
+    }
+    private fun showSettingsMenu() {
+        if(recording || sending || composer!=null || settingsDialog?.isShowing==true)return
+        stopContinuous(false);speech.stop();closeDeskClock()
+        val connection=funText("연결","接続","Connection")
+        val appearance=funText("화면·소리","画面・サウンド","Display & sound")
+        fun entry(id:String,title:String,subtitle:String,section:String=appearance,action:()->Unit)=MuseSettingsDialog.Entry(id,title,subtitle,section,action)
+        val entries=listOf(
+            entry("wifi","Wi-Fi","",connection){openWifiPanel()},
+            entry("device",funText("기기·Muse 연결","デバイス・Muse接続","Device & Muse connection"),"",connection){showControls()},
+            entry("reading",funText("글자 크기·음성 속도","文字サイズ・音声速度","Text size & voice speed"),funText("편하게 읽고 듣기","読みやすさ・聞きやすさ","Reading and speech preferences")){showReadingSettings()},
+            entry("volume",funText("음량","音量","Volume"),funText("음성 답변·배경음 크기","音声応答・BGMの音量","Voice and music volume")){showVolumeSettings()},
+            entry("screen",funText("화면 자동 꺼짐","画面の自動消灯","Screen timeout"),funText("Muse 화면 계속 켜기 선택","Muse画面の常時点灯","Choose whether Muse stays awake")){showScreenTimeoutSettings()},
+            entry("clock",funText("충전 중 탁상시계","充電中の置き時計","Charging desk clock"),funText("시계 표시·전환 대기 시간","時計表示・切替待ち時間","Clock display and idle delay")){showDeskClockSettings()},
+            entry("avatar",funText("반응하는 아바타","アバターの動き","Reactive avatar"),funText("대화 중 아바타 움직임","会話中のアバターの動き","Avatar animation during conversation")){showAvatarSettings()},
+            entry("language",funText("표시 언어","表示言語","Display language"),"한국어 · 日本語 · English"){showSettingsLanguage()}
+        )
+        settingsDialog=MuseSettingsDialog(this,entries,::wifiSettingsSummary){
+            if(connected)funText("Muse 연결됨 · 사이드 버튼·시스템","Muse接続済み · ボタン・システム","Muse connected · Buttons and system")
+            else funText("Muse 연결 안 됨 · 페어링·사이드 버튼","Muse未接続 · ペアリング・ボタン","Muse offline · Pairing and side button")
+        }.also { d-> d.setOnDismissListener{settingsDialog=null;lastInteraction=android.os.SystemClock.elapsedRealtime()};d.show() }
+    }
+    private fun openWifiPanel() {
+        if(BuildConfig.DEMO)return
+        // Password entry stays in Android's trusted Wi-Fi dialog; Muse never receives it.
+        returnToSettings=true
+        try { startActivity(Intent(Settings.Panel.ACTION_WIFI)) }
+        catch(_:android.content.ActivityNotFoundException) {
+            try { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
+            catch(_:android.content.ActivityNotFoundException) { returnToSettings=false;android.widget.Toast.makeText(this,funText("Wi-Fi 설정을 열 수 없습니다","Wi-Fi設定を開けません","Wi-Fi settings unavailable"),android.widget.Toast.LENGTH_SHORT).show() }
+        }
+    }
+    private fun showAvatarSettings() {
+        controls=AlertDialog.Builder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
+            .setSingleChoiceItems(arrayOf(funText("켜기","オン","On"),funText("끄기","オフ","Off")),if(getSharedPreferences("gadget_ui",MODE_PRIVATE).getBoolean("reactive_avatar",true))0 else 1){d,index->
+                getSharedPreferences("gadget_ui",MODE_PRIVATE).edit().putBoolean("reactive_avatar",index==0).apply();screen.invalidateAvatar();d.dismiss()
+            }.setNegativeButton(tr("닫기"),null).show()
+    }
+    private fun showSettingsLanguage() {
+        controls=AlertDialog.Builder(this).setTitle(funText("표시 언어","表示言語","Display language"))
+            .setSingleChoiceItems(DisplayLanguage.entries.map{"${it.flag} ${it.label}"}.toTypedArray(),UiText.language(this).ordinal){d,index->
+                UiText.set(this,DisplayLanguage.entries[index]);refreshLanguageControls();screen.refreshDisplayLanguage();if(hasConversation)renderConversation()
+                d.dismiss();settingsDialog?.dismiss();showSettingsMenu()
+            }.setNegativeButton(tr("닫기"),null).show()
+    }
+    private fun showVolumeSettings() {
+        val audio=getSystemService(AudioManager::class.java)
+        val content=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24,8,24,8)}
+        val label=TextView(this).apply{textSize=16f;gravity=android.view.Gravity.CENTER}
+        val slider=android.widget.SeekBar(this).apply{max=audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);progress=audio.getStreamVolume(AudioManager.STREAM_MUSIC)}
+        fun update(){label.text="${slider.progress} / ${slider.max}"}
+        slider.setOnSeekBarChangeListener(object:android.widget.SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(bar:android.widget.SeekBar,value:Int,fromUser:Boolean){if(fromUser)audio.setStreamVolume(AudioManager.STREAM_MUSIC,value,0);update()}
+            override fun onStartTrackingTouch(bar:android.widget.SeekBar){}
+            override fun onStopTrackingTouch(bar:android.widget.SeekBar){}
+        })
+        content.addView(label);content.addView(slider,LinearLayout.LayoutParams(-1,(64*resources.displayMetrics.density).toInt()));update()
+        controls=AlertDialog.Builder(this).setTitle(funText("음량","音量","Volume")).setView(content).setNegativeButton(tr("닫기"),null).show()
     }
 
     private fun showScreenTimeoutSettings() {
@@ -555,6 +690,7 @@ class MainActivity : Activity() {
         refreshFunStatus()
         refreshQuickControls()
         conversationButton.text = tr("대화"); modeButton.text = tr("통역")
+        settingsButton.contentDescription=funText("설정","設定","Settings")
         displayLanguageButton.text = "${UiText.language(this).flag} ⌄"
         displayLanguageButton.contentDescription = tr("표시 언어")
         displayLanguageButton.isEnabled = !recording && !sending && !continuous
@@ -670,6 +806,7 @@ class MainActivity : Activity() {
 
     private fun updateStatus(value: String) {
         screen.setState(value)
+        petRoom?.agentUpdate(tr(value),reveal=recording || sending)
         refreshLanguageControls()
         screen.setHistoryState(hasConversation, historyLoaded && !recording && !sending && !continuous)
     }
@@ -703,13 +840,15 @@ class MainActivity : Activity() {
         controls = AlertDialog.Builder(this)
             .setTitle(tr("Device controls"))
             .setItems(arrayOf(if (paired) "Reconnect to Muse" else "Pair with Muse", "Android settings",
-                "Return to idle", "Show conversation", "Side button settings").map(::tr).toTypedArray()) { _, item ->
+                "Return to idle", "Show conversation", "Side button settings",
+                funText("Muse 다시 페어링", "Museと再ペアリング", "Pair with Muse again")).map(::tr).toTypedArray()) { _, item ->
                 when (item) {
                     0 -> if (paired) { disconnect(); connect() } else startPairing()
                     1 -> startActivity(Intent(Settings.ACTION_SETTINGS))
                     2 -> screen.showIdle()
                     3 -> if (hasConversation) renderConversation()
                     4 -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    5 -> { disconnect();repairPairingRequested=true;startPairing() }
                 }
             }
             .setNegativeButton(tr("Back to Muse"), null)
@@ -718,6 +857,11 @@ class MainActivity : Activity() {
 
     private fun renderConversation() {
         screen.showConversation(history, transcriptPending)
+        if(inPetMode) {
+            val current=activeTurn ?: history.lastOrNull()
+            val text=current?.let { listOf(it.user.orEmpty(),it.replies.values.joinToString("\n\n")).filter { part -> part.isNotBlank() }.joinToString("\n\n") }
+            petRoom?.agentUpdate(funText("Muse 대화","Museとの会話","Muse conversation"),text?.let { it.replace("**", "") },reveal=sending || recording)
+        }
         screen.setHistoryState(hasConversation, historyLoaded && !recording && !sending && !continuous)
     }
 
@@ -727,9 +871,12 @@ class MainActivity : Activity() {
         historyStore.save(history)
         renderConversation()
         if (done) {
+            if(inPetMode && current !== petRewardedTurn && current.replies.getValue(id).isNotBlank()) {
+                petRoom?.agentReward();petRewardedTurn=current
+            }
             sending = false; turnTimeout?.cancel(); updateStatus("REPLY RECEIVED")
             if (current.replies.getValue(id).isBlank() && continuous) { stopContinuous(); return }
-            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else if(funModes.mode=="practice")funModes.language.code!! else "ko")
+            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else if(funModes.mode=="practice" && !activePetTurn)funModes.language.code!! else "ko")
             else {
                 releaseScreenAwake()
                 if (continuous) scheduleListening()
@@ -758,7 +905,7 @@ class MainActivity : Activity() {
     }
 
     private fun handleLocalClock(text:String,voice:Boolean):Boolean {
-        val interpreting=if(voice)activeLanguageMode.interpreting else languageMode.interpreting
+        val interpreting=if(inPetMode || (voice && activePetTurn))false else if(voice)activeLanguageMode.interpreting else languageMode.interpreting
         val command=ReminderCommand.parse(text,interpreting) ?: LocalClockCommand.parse(text,interpreting) ?: return false
         sending=false;transcriptPending=false;turnTimeout?.cancel()
         releaseScreenAwake()
@@ -783,7 +930,13 @@ class MainActivity : Activity() {
         foreground = this
         if (BuildConfig.DEMO) { networkStatus.showDemo(); showOfflineDemo(); return }
         networkStatus.start()
+        if(!networkWatching) {
+            networkWatching=true
+            getSystemService(android.net.ConnectivityManager::class.java).registerDefaultNetworkCallback(connectionNetworkCallback)
+        }
         lastInteraction=android.os.SystemClock.elapsedRealtime()
+        if(returnToSettings) { returnToSettings=false;showSettingsMenu() }
+        settingsDialog?.refreshStatus()
         if(!batteryRegistered){registerReceiver(batteryReceiver,android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));batteryRegistered=true}
         if (keepScreenAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         quickButton.removeCallbacks(playbackControls);quickButton.post(playbackControls)
@@ -803,7 +956,8 @@ class MainActivity : Activity() {
                 else screen.showNotice(if (store.sdkToken() == null) "SDK token needed.\nThen pair with Muse on your phone."
                     else "Hold the empty background, choose Pair with Muse, then add a gadget on your phone.")
                 if (pairingRequested && getSystemService(android.bluetooth.BluetoothManager::class.java).adapter.isEnabled) startPairing()
-            } else if (connection == null) connect()
+            } else if(pairingRequested && repairPairingRequested) startPairing()
+            else if (connection == null && !repairPairingRequested) connect()
         } catch (_: Exception) { updateStatus("SECURE STORAGE ERROR"); screen.showNotice("Couldn't open the device credentials.") }
     }
 
@@ -813,6 +967,14 @@ class MainActivity : Activity() {
         demoShown = true
         val scene = intent.getStringExtra("demo_scene") ?: "chat"
         history.clear()
+        if(scene.startsWith("pet-")) {
+            val now=System.currentTimeMillis()
+            val age=if(scene=="pet-adult") 10*PetState.DAY else 0L
+            PetStore(this).save(PetState(updatedAt=now,seed=42L,hatched=scene!="pet-egg",ageMs=age,
+                food=65.0,mood=88.0,energy=82.0,clean=90.0,warmth=78.0,
+                form=if(age>0)PetForm.COMPANION else PetForm.UNDECIDED))
+            getSharedPreferences("pet_audio",MODE_PRIVATE).edit().putString("mode","auto").putBoolean("effects",true).apply()
+        }
         batteryPercent=86; charging=true; refreshBatteryStatus()
         getSharedPreferences("local_clock", MODE_PRIVATE).edit().remove("entries").commit()
         if(scene=="alarms" || scene=="home") {
@@ -845,7 +1007,13 @@ class MainActivity : Activity() {
                 "clock" -> { deskClock=DeskClockDialog(this@MainActivity,{86}) { deskClock=null };deskClock?.show() }
                 "alarms" -> showClockPanel()
                 "reminder" -> showClockPanel(ClockCommand("reminder",title="Weekend walk"))
-                "settings" -> showReadingSettings()
+                "settings" -> showSettingsMenu()
+                "reading" -> showReadingSettings()
+                "quick" -> showQuickQuestions()
+                "pet-egg", "pet-baby", "pet-adult", "pet-food", "pet-play", "pet-music", "pet-agent" -> {
+                    showPetRoom()
+                    if(scene=="pet-agent")petRoom?.agentUpdate("OFFLINE DEMO · SAMPLE DATA", "$user\n\n$answer", true)
+                }
                 "languages" -> showDisplayLanguages()
                 "keyboard" -> showComposer(UiText.text(this@MainActivity,"일본어로 인사하는 법을 알려줘.","韓国語の挨拶を教えて。","How do I say hello in Korean?"))
                 "tasks", "favorites" -> startActivity(Intent(this@MainActivity,LibraryActivity::class.java).putExtra("mode",if(scene=="tasks")2 else 1))
@@ -855,7 +1023,7 @@ class MainActivity : Activity() {
 
     private fun startPairing() {
         if (store.sdkToken() == null) { screen.showNotice("Install your SDK token securely over USB first."); return }
-        if (store.credentials() != null) { connect(); return }
+        if (store.credentials() != null && !repairPairingRequested) { connect(); return }
         pairingRequested = true
         val needed = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE)
             .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
@@ -866,17 +1034,54 @@ class MainActivity : Activity() {
         pairingWindow?.cancel()
         pairing?.close()
         pairing = PairingServer(this, store.identity, store::sdkToken, { credentials ->
-            try { store.save(credentials); runOnUiThread { connect() }; true } catch (_: Exception) { false }
+            try { store.save(credentials); runOnUiThread { repairPairingRequested=false;disconnect();connect() }; true } catch (_: Exception) { false }
         }, { value -> runOnUiThread { updateStatus(value.replace('_', ' ').uppercase()) } })
         if (pairing!!.start()) {
             pairingRequested = false
             screen.showNotice("In Muse on your phone, add a gadget.\n\nChoose ${store.identity.bleName}.\n\nThis r1 uses its current Wi-Fi connection.")
-            pairingWindow = scope.launch { delay(120_000); if (store.credentials() == null) { pairing?.close(); pairing = null; updateStatus("PAIRING CLOSED") } }
+            pairingWindow = scope.launch { delay(120_000); if (store.credentials() == null || repairPairingRequested) { pairing?.close(); pairing = null;repairPairingRequested=false; updateStatus("PAIRING CLOSED") } }
         }
     }
 
+    private var reconnectJob:Job?=null
+    private var reconnectAttempt=0
+    private var networkWatching=false
+    private var lastValidatedNetwork:android.net.Network?=null
+    private val connectionNetworkCallback=object:android.net.ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(network:android.net.Network,caps:android.net.NetworkCapabilities) {
+            if(!caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED))return
+            runOnUiThread {
+                if(!networkWatching || foreground!==this@MainActivity || network==lastValidatedNetwork)return@runOnUiThread
+                lastValidatedNetwork=network
+                if(!connected && connection==null) { reconnectAttempt=0;scheduleReconnect() }
+            }
+        }
+        override fun onLost(network:android.net.Network) { runOnUiThread { if(network==lastValidatedNetwork)lastValidatedNetwork=null } }
+    }
+    private fun scheduleReconnect(authenticationRejected:Boolean=false) {
+        if(foreground!==this || repairPairingRequested || connection!=null || reconnectJob?.isActive==true || reconnectAttempt>=3)return
+        val wait=maxOf(longArrayOf(2000,5000,15000)[reconnectAttempt++],if(authenticationRejected)15000L else 0L)
+        reconnectJob=scope.launch {
+            delay(wait);reconnectJob=null
+            if(foreground===this@MainActivity && connection==null)connect()
+        }
+    }
+    private val connectionDiagnostics=mutableListOf<String>()
+    @Synchronized private fun recordConnectionDiagnostic(value:String) {
+        // Only stage names, HTTP codes and exception class names; never URLs, bodies or credentials.
+        val safe=value.takeIf { it.matches(Regex("[A-Za-z0-9_]+")) } ?: "unknown"
+        if(safe=="account_start")connectionDiagnostics.clear()
+        connectionDiagnostics.add(safe)
+        if(connectionDiagnostics.size>20)connectionDiagnostics.removeAt(0)
+        val edit=getSharedPreferences("connection_diagnostic",MODE_PRIVATE).edit()
+            .putString("steps",connectionDiagnostics.joinToString(" > ")).putLong("checked",System.currentTimeMillis())
+        if(safe.startsWith("refresh_http_"))edit.putString("last_refresh",safe)
+        if(safe.startsWith("websocket_failure_") || safe.startsWith("gateway_reason_"))edit.putString("last_failure",safe)
+        edit.apply()
+    }
     private fun connect() {
-        if (connection != null) return
+        if(BuildConfig.DEMO)return
+        if (connection != null || repairPairingRequested) return
         val credentials = store.credentials() ?: return
         lateinit var current: MuseConnection
         current = MuseConnection(credentials, store.sdkToken(), store::save,
@@ -884,11 +1089,19 @@ class MainActivity : Activity() {
                 if (connection !== current) return@runOnUiThread
                 updateStatus(value.uppercase())
                 if (value == "Disconnected" || value == "Connection lost") {
-                    stopContinuous(false)
-                    connected = false
-                    transcriptFetch?.cancel()
-                    transcriptPending = false
-                    if (hasConversation && !recording) renderConversation()
+                    // A closed transport must not block connect() after the network recovers.
+                    connection=null;connected=false
+                    val wasSending=sending
+                    stopContinuous(false);finishRecording(false)
+                    sending=false;sendJob?.cancel();turnTimeout?.cancel();transcriptFetch?.cancel()
+                    transcriptPending=false
+                    if(hasConversation)renderConversation()
+                    if(wasSending)petRoom?.agentUpdate(funText("연결 끊김 · 자동 재전송하지 않음","接続切断 · 自動再送しません","Disconnected · No automatic resend"),reveal=true)
+                    if(current.pairingRejected) {
+                        screen.showNotice(funText("Muse 인증을 다시 연결해야 합니다.\n빈 배경을 길게 누르고 ‘Muse 다시 페어링’을 선택하세요.\n대화 기록과 음성 설정은 유지됩니다.",
+                            "Museの再ペアリングが必要です。\n背景を長押しして「Museと再ペアリング」を選んでください。履歴と音声設定は保持されます。",
+                            "Muse pairing needs renewal.\nHold the background and choose Pair with Muse again. History and voice settings are preserved."))
+                    } else scheduleReconnect(current.authenticationRejected)
                 }
             } },
             { id, text, done -> runOnUiThread {
@@ -898,13 +1111,13 @@ class MainActivity : Activity() {
             { text -> runOnUiThread {
                 if (connection !== current || recording) return@runOnUiThread
                 if (!localTranscript) receiveTranscript(text)
-            } })
+            } }, ::recordConnectionDiagnostic, refreshDeviceId=store.identity.nodeId)
         connection = current
         scope.launch {
             try {
                 withContext(Dispatchers.IO) { current.connect() }
                 if (connection !== current) return@launch
-                connected = true
+                connected = true;reconnectAttempt=0;reconnectJob?.cancel();reconnectJob=null
                 updateStatus("READY")
                 if (hasConversation) renderConversation() else screen.showIdle()
                 sendPendingPhoto()
@@ -920,7 +1133,7 @@ class MainActivity : Activity() {
     }
 
     private fun startCapture(automatic: Boolean) {
-        if(funModes.mode=="practice" && store.elevenLabs()==null){screen.showNotice(funText("음성 회화 연습에는 ElevenLabs 음성 인식 설정이 필요합니다. 키보드로도 연습할 수 있습니다.","音声練習にはElevenLabsの設定が必要です。文字でも練習できます。","Voice practice needs ElevenLabs speech recognition. You can also practice with the keyboard."));return}
+        if(!inPetMode && funModes.mode=="practice" && store.elevenLabs()==null){screen.showNotice(funText("음성 회화 연습에는 ElevenLabs 음성 인식 설정이 필요합니다. 키보드로도 연습할 수 있습니다.","音声練習にはElevenLabsの設定が必要です。文字でも練習できます。","Voice practice needs ElevenLabs speech recognition. You can also practice with the keyboard."));return}
         if (!historyLoaded || recording || languageDialog?.isShowing == true || controls?.isShowing == true || clearDialog?.isShowing == true) return
         if (!connected || sending) {
             if (!connected) screen.showNotice(if (store.credentials() == null) "Pair this r1 with Muse on your phone first."
@@ -1022,9 +1235,9 @@ class MainActivity : Activity() {
                     ensureActive()
                     if (connection !== current || turn != thisTurn) return@launch
                     receiveTranscript(text)
-                    if (funModes.mode!="practice" && handleLocalClock(text, true)) return@launch
+                    if ((activePetTurn || funModes.mode!="practice") && handleLocalClock(text, true)) return@launch
                     updateStatus("MUSE에 전송 중")
-                    withContext(Dispatchers.IO) { checkNotNull(current).sendText(if(funModes.mode=="practice") practicePayload(text) else activeLanguageMode.message(text)) }
+                    withContext(Dispatchers.IO) { checkNotNull(current).sendText(if(funModes.mode=="practice" && !activePetTurn) practicePayload(text) else activeLanguageMode.message(text)) }
                 } else {
                     val userId = withContext(Dispatchers.IO) { checkNotNull(current).sendVoice(wav) }
                     if (connection === current && turn == thisTurn && transcriptPending) fetchTranscript(current!!, userId, thisTurn)
@@ -1074,7 +1287,7 @@ class MainActivity : Activity() {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val message = input.text.toString().trim()
                 if (message.isBlank()) { input.error = UiText.text(this, "내용을 입력해 주세요", "内容を入力してください", "Enter a message"); return@setOnClickListener }
-                if (((!connected || connection == null) && LocalClockCommand.parse(message,languageMode.interpreting)==null) || sending || recording) {
+                if (((!connected || connection == null) && LocalClockCommand.parse(message,if(inPetMode)false else languageMode.interpreting)==null && ReminderCommand.parse(message,if(inPetMode)false else languageMode.interpreting)==null) || sending || recording) {
                     input.error = UiText.text(this, "Muse 연결 후 다시 보내 주세요", "Muse接続後に再度送信してください", "Connect to Muse before sending"); return@setOnClickListener
                 }
                 if (photo == null) sendTypedMessage(message, plainConversation)
@@ -1089,17 +1302,18 @@ class MainActivity : Activity() {
     }
 
     private fun sendTypedMessage(message: String, plainConversation: Boolean = false) {
-        if (funModes.mode!="practice" && !plainConversation && handleLocalClock(message, false)) return
+        if ((inPetMode || (funModes.mode!="practice" && !plainConversation)) && handleLocalClock(message, false)) return
         val current = connection ?: return
-        activeLanguageMode = if (plainConversation) languageMode.copy(interpreting = false) else languageMode
+        activeLanguageMode = if (plainConversation || inPetMode) languageMode.copy(interpreting = false) else languageMode
         localTranscript = true
         replySpeechStopped=false
+        activePetTurn=inPetMode
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { it.user = message; history.add(it) }
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "Muse에 전송 중", "Museに送信中", "Sending to Muse"))
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val payload = if(funModes.mode=="practice" && !plainConversation) practicePayload(message) else activeLanguageMode.message(message)
+        val payload = if(funModes.mode=="practice" && !plainConversation && !inPetMode) practicePayload(message) else activeLanguageMode.message(message)
         sendJob = scope.launch {
             try { withContext(Dispatchers.IO) { current.sendText(payload) } }
             catch (error: Exception) {
@@ -1126,6 +1340,7 @@ class MainActivity : Activity() {
         activeLanguageMode = languageMode.copy(interpreting = true, target = request.replyLanguage)
         localTranscript = true
         replySpeechStopped=false
+        activePetTurn=inPetMode
         activeTurn = ConversationTurn().also { it.user = "[사진] " + request.question; history.add(it) }
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
@@ -1148,9 +1363,10 @@ class MainActivity : Activity() {
     }
 
     private fun startVoiceTurn() {
-        activeLanguageMode = if(funModes.mode=="practice")languageMode.copy(interpreting=false,input=funModes.language) else languageMode
+        activeLanguageMode = if(inPetMode)languageMode.copy(interpreting=false) else if(funModes.mode=="practice")languageMode.copy(interpreting=false,input=funModes.language) else languageMode
         localTranscript = store.elevenLabs() != null
         replySpeechStopped=false
+        activePetTurn=inPetMode
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { history.add(it) }
         sending = true; transcriptPending = true
         historyStore.save(history)
@@ -1222,14 +1438,21 @@ class MainActivity : Activity() {
     }
 
     private fun disconnect() {
+        reconnectJob?.cancel();reconnectJob=null;reconnectAttempt=0
         continuous = false; resumeListening?.cancel(); sendJob?.cancel()
         if (recording) finishRecording(false)
         connected = false; sending = false; turnTimeout?.cancel(); transcriptFetch?.cancel()
         transcriptPending = false
         if (hasConversation && !recording) renderConversation()
-        releaseScreenAwake(); connection?.close(); connection = null
+        releaseScreenAwake();val previous=connection;connection=null;previous?.close()
     }
     override fun onPause() {
+        petRoom?.cancelAgentInput()
+        reconnectJob?.cancel();reconnectJob=null
+        if(networkWatching) {
+            networkWatching=false;lastValidatedNetwork=null
+            getSystemService(android.net.ConnectivityManager::class.java).unregisterNetworkCallback(connectionNetworkCallback)
+        }
         networkStatus.stop()
         closeDeskClock()
         if(batteryRegistered){unregisterReceiver(batteryReceiver);batteryRegistered=false}
@@ -1244,6 +1467,8 @@ class MainActivity : Activity() {
         super.onPause()
     }
     override fun onStop() {
+        settingsDialog?.dismiss()
+        petRoom?.dismiss()
         quickDialog?.dismiss()
         composer?.dismiss()
         PhotoQuestion.pending = null
@@ -1255,7 +1480,7 @@ class MainActivity : Activity() {
         scope.coroutineContext.cancelChildren()
         super.onStop()
     }
-    override fun onDestroy() { clockDialog?.dismiss();speech.close(); scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { settingsDialog?.dismiss();clockDialog?.dismiss();speech.close(); scope.cancel(); super.onDestroy() }
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, permissions, results)
         clockPanel?.permissionResult(code,results)

@@ -41,3 +41,7 @@ Weather is a separate HTTPS request to Open-Meteo using coordinates rounded to t
 Activity modes store the selected mode, practice language/scenario and hunt target locally. Practice text goes to Muse; configured ElevenLabs transcribes voice practice. Hunt photos are sent only after the existing photo-review confirmation. No scores or audio archive are added. The clock idle delay is a local preference.
 
 The foreground network indicator uses ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE and READ_BASIC_PHONE_STATE (on supported Android versions) to display connection and signal information. It does not log or persist network names, phone numbers or SIM identifiers, and makes no external request. The offline demo strips the two added permissions and uses a fixed fictional signal.
+
+## V2.0 local state and offline fixtures
+
+Pet needs, care history, personality and prior-life archives are stored in app-private preferences; they are not uploaded by the pet simulation. Pet-room questions still use the existing assistant data path. Local synthesized music needs no network. Wi-Fi passwords are entered in Android's system UI, never collected by Muse. Connection diagnostics store only bounded stage/error identifiers and timestamps. Demo images are produced in a separate unpaired emulator package with fictional data and simulated growth; no personal device backup is used.

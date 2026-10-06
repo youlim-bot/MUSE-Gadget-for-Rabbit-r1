@@ -43,6 +43,7 @@ internal class ClockPanel(private val host:Activity,private val close:()->Unit):
     fun command(c:ClockCommand){if(c.kind=="reminder")reminder(c.title)else if(c.kind in setOf("timer","alarm"))confirm(c)else if(c.kind=="help")help()}
     fun permissionResult(code:Int,grants:IntArray){if(code==731 && grants.firstOrNull()==PackageManager.PERMISSION_GRANTED)pendingPermission?.let{pendingPermission=null;confirm(it)}}
     private fun permission():Boolean {
+        if(BuildConfig.DEMO) { Toast.makeText(this,"OFFLINE DEMO · No alarms scheduled",Toast.LENGTH_SHORT).show();return false }
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){host.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),731);return false}
         if(!LocalClock.exact(this)){AlertDialog.Builder(this).setMessage(t("정시에 울리려면 ‘알람 및 리마인더’ 권한을 허용한 뒤 다시 설정해 주세요.","正確なアラーム権限を許可してから設定してください。","Allow Alarms & reminders, then set the alarm again.")).setPositiveButton(t("설정 열기","設定","Open settings")){_,_->startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:$packageName")))}.setNegativeButton(t("취소","キャンセル","Cancel"),null).show();return false}
         if(!getSystemService(NotificationManager::class.java).areNotificationsEnabled()){startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName));return false}

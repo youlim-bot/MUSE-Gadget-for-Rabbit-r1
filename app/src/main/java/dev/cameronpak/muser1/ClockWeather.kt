@@ -21,7 +21,7 @@ import kotlin.math.roundToInt
 
 /** Foreground-only weather: coordinates are rounded and never persisted or logged. */
 internal object ClockWeather {
-    data class Reading(val place: String, val temperature: Int, val code: Int, val fetched: Long, val humidity: Int? = null, val uv: Double? = null, val isDay: Boolean = true)
+    data class Reading(val place: String, val temperature: Int, val code: Int, val fetched: Long, val humidity: Int? = null, val uv: Double? = null, val isDay: Boolean = true, val uvMax: Double? = null, val forecastAt: Long = -1L)
     private var cached: Reading? = null
     private var cachedLanguage: DisplayLanguage? = null
     private val client = OkHttpClient.Builder().callTimeout(12, TimeUnit.SECONDS).build()
@@ -31,10 +31,10 @@ internal object ClockWeather {
     fun permitted(context: Context) = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     fun request(host: Activity) = host.requestPermissions(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION), 741)
     @Suppress("MissingPermission", "DEPRECATION")
-    suspend fun load(context: Context): Reading {
-        if(BuildConfig.DEMO) return Reading("Sample City",24,2,SystemClock.elapsedRealtime(),62,3.2,true)
+    suspend fun load(context: Context, forceRefresh: Boolean = false): Reading {
+        if(BuildConfig.DEMO) return Reading("Sample City",24,2,SystemClock.elapsedRealtime(),62,3.2,true,5.1,System.currentTimeMillis()/1000)
         check(permitted(context))
-        cached?.takeIf { SystemClock.elapsedRealtime()-it.fetched < 15*60_000 && cachedLanguage==UiText.language(context) }?.let { return it }
+        cached?.takeIf { !forceRefresh && cacheFresh(it,SystemClock.elapsedRealtime(),System.currentTimeMillis()) && cachedLanguage==UiText.language(context) }?.let { return it }
         val manager = context.getSystemService(LocationManager::class.java)
         val providers = manager.getProviders(true).filter { it != LocationManager.PASSIVE_PROVIDER }
         val recent = providers.mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
@@ -71,7 +71,7 @@ internal object ClockWeather {
                 } else null
             } } catch(e: Exception) { ensureActive(); null }
                 ?: UiText.text(context,"현재 지역","現在地","Current area")
-            val request = Request.Builder().url("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,relative_humidity_2m,is_day&hourly=uv_index&forecast_days=1&timeformat=unixtime&timezone=auto").build()
+            val request = Request.Builder().url("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,relative_humidity_2m,is_day&hourly=uv_index&daily=uv_index_max&forecast_days=1&timeformat=unixtime&timezone=auto").build()
             val value = client.newCall(request).execute().use { response ->
                 check(response.isSuccessful)
                 decode(response.body!!.string(), place, SystemClock.elapsedRealtime())
@@ -94,7 +94,32 @@ internal object ClockWeather {
             val hour=times.optLong(it,-1); hour>=0 && stamp>=hour && stamp-hour<3600
         }
         val uv=index?.let { uvValues?.optDouble(it) }?.takeIf { it.isFinite() && it>=0 }
-        return Reading(place,temperature.roundToInt(),current.getInt("weather_code"),fetched,humidity,uv,current.optInt("is_day",1)!=0)
+        val daily=root.optJSONObject("daily")
+        val days=daily?.optJSONArray("time")
+        // UNIX timestamps are UTC; convert both instants to the API location's calendar date.
+        val zone=runCatching { java.time.ZoneId.of(root.optString("timezone","UTC")) }.getOrElse {
+            java.time.ZoneOffset.ofTotalSeconds(root.optInt("utc_offset_seconds",0).coerceIn(-64800,64800))
+        }
+        fun date(time:Long)=java.time.Instant.ofEpochSecond(time).atZone(zone).toLocalDate()
+        val dayIndex=if(stamp<0 || days==null)null else (0 until days.length()).firstOrNull {
+            val day=days.optLong(it,-1);day>=0 && date(day)==date(stamp)
+        }
+        val uvMax=dayIndex?.let { daily?.optJSONArray("uv_index_max")?.optDouble(it) }?.takeIf { it.isFinite() && it>=0 }
+        return Reading(place,temperature.roundToInt(),current.getInt("weather_code"),fetched,humidity,uv,current.optInt("is_day",1)!=0,uvMax,stamp)
+    }
+    internal fun cacheFresh(reading:Reading,elapsed:Long,wallMillis:Long):Boolean =
+        elapsed-reading.fetched in 0 until 15*60_000L && reading.forecastAt>=0 &&
+            wallMillis/3_600_000L==reading.forecastAt/3600L
+    internal fun metrics(language:DisplayLanguage,reading:Reading):String {
+        fun uv(value:Double?)=value?.let { String.format(Locale.US,"%.1f",it) }?:"—"
+        val humidity=reading.humidity?.let { "$it%" }?:"—"
+        val night=if(reading.isDay || reading.uv==null)"" else when(language){DisplayLanguage.KO->" (야간)";DisplayLanguage.JA->" (夜間)";DisplayLanguage.EN->" (night)"}
+        val current=uv(reading.uv);val peak=uv(reading.uvMax)
+        return when(language){
+            DisplayLanguage.KO->"습도 $humidity · 현재 UV $current$night\n오늘 최고 UV $peak"
+            DisplayLanguage.JA->"湿度 $humidity · 現在UV $current$night\n今日の最大UV $peak"
+            DisplayLanguage.EN->"Humidity $humidity · UV now $current$night\nToday's peak UV $peak"
+        }
     }
     internal fun icon(code: Int, isDay: Boolean): String = when(code) {
         0 -> if(isDay) "☀️" else "🌙"

@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MuseConnection(
     private var credentials: DeviceCredentials,
@@ -22,9 +23,16 @@ class MuseConnection(
     private val onStatus: (String) -> Unit,
     private val onReply: (messageId: String, text: String, done: Boolean) -> Unit,
     private val onUserTranscript: (String) -> Unit = {},
+    private val onDiagnostic: (String) -> Unit = {},
+    private val refreshDeviceId: String,
 ) {
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
-        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).build()
+        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS).build()
+    @Volatile var authenticationRejected = false
+        private set
+    @Volatile var pairingRejected = false
+        private set
     private val ids = AtomicLong(1)
     private val lock = Any()
     private val streams = mutableMapOf<Long, Stream>()
@@ -37,6 +45,8 @@ class MuseConnection(
     private val replies = ReplyTracker(onUserTranscript, onReply)
     private var transcriptAfterSeq = 0L
 
+    companion object { private val sdkReportAttempted=AtomicBoolean(false) }
+
     private class Vm(val token: String, val id: String)
     private class Stream(val path: String, val complete: CompletableDeferred<Unit>?, val limit: Int) {
         var status = 0
@@ -45,15 +55,26 @@ class MuseConnection(
     }
 
     suspend fun connect() {
-        onStatus("Connecting")
+        onStatus("Connecting");onDiagnostic("account_start")
         try {
+            // Match the official SDK: report the SDK token via a startup refresh.
+            // A refused optional refresh must never erase an existing pairing.
+            if(!sdkToken.isNullOrBlank() && sdkReportAttempted.compareAndSet(false,true)) {
+                onDiagnostic("sdk_refresh_start")
+                try { refresh() } catch(error:Exception) {
+                    currentCoroutineContext().ensureActive()
+                    onDiagnostic("sdk_refresh_unavailable")
+                }
+            }
             var vm = fetchVm(credentials.accessToken)
-            if (vm == null) { refresh(); vm = fetchVm(credentials.accessToken) }
+            if (vm == null) { onDiagnostic("refresh_start");refresh();onDiagnostic("account_retry");vm = fetchVm(credentials.accessToken) }
+            if(vm==null)onDiagnostic("vm_unavailable")
             checkNotNull(vm) { "Muse is unavailable" }
             synchronized(lock) { check(!closed && ws == null); open(vm) }
             withTimeout(20_000) { ready.await() }
-            onStatus("Connected")
-        } catch (error: Exception) { close(); throw IllegalStateException("Muse connection failed", error) }
+            authenticationRejected=false;pairingRejected=false
+            onDiagnostic("ready");onStatus("Connected")
+        } catch (error: Exception) { onDiagnostic("connect_failure_"+error.javaClass.simpleName);close();throw IllegalStateException("Muse connection failed", error) }
     }
 
     suspend fun sendText(text: String) {
@@ -168,6 +189,8 @@ class MuseConnection(
         val request = Request.Builder().url("${apiRoot()}/fetch_vms")
             .header("Authorization", "Bearer $token").header("X-API-Version", "1.0.0").build()
         client.newCall(request).execute().use { response ->
+            onDiagnostic("account_http_${response.code}")
+            if(response.code==401 || response.code==403)authenticationRejected=true
             if (response.code == 401) return null
             check(response.isSuccessful) { "Muse account request failed" }
             val list = JSONObject(response.body?.string().orEmpty()).optJSONArray("vm_list") ?: return null
@@ -187,12 +210,16 @@ class MuseConnection(
 
     private fun refresh() {
         val raw = credentials.refreshToken.substringAfterLast(':')
-        val body = JSONObject().put("device_id", credentials.deviceId)
+        // The refresh API calls this device_id but requires the gadget node ID,
+        // as in the official SDK service, not the BLE hatch-link identity.
+        val body = JSONObject().put("device_id", refreshDeviceId)
         sdkToken?.let { body.put("sdk_token", it) }
         val request = Request.Builder().url("${apiRoot()}/device_token/refresh")
             .header("Authorization", "Bearer hatch_refresh:$raw")
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
         client.newCall(request).execute().use { response ->
+            onDiagnostic("refresh_http_${response.code}")
+            if(response.code==401)pairingRejected=true
             check(response.isSuccessful) { "Pairing refresh failed" }
             var json = JSONObject(response.body?.string().orEmpty())
             json.optJSONObject("payload")?.let { json = it }
@@ -214,6 +241,7 @@ class MuseConnection(
     }
 
     private fun open(vm: Vm) {
+        onDiagnostic("websocket_start")
         val host = credentials.noiseHost.lowercase()
         require(host == "hatch.metaaivm.com" || host.endsWith(".metaaivm.com") || host.endsWith(".muse.ai"))
         val url = HttpUrl.Builder().scheme("https").host(host).addPathSegments("v1/noise")
@@ -224,6 +252,7 @@ class MuseConnection(
 
     private inner class Listener : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            onDiagnostic("websocket_http_${response.code}")
             synchronized(lock) { if (!closed) webSocket.send(ByteString.of(*handshake!!.message1())) }
         }
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -232,6 +261,7 @@ class MuseConnection(
                     if (closed) return
                     val h = handshake
                     if (h != null) {
+                        onDiagnostic("noise_handshake")
                         val (message3, pair) = h.message3(bytes.toByteArray())
                         noise = pair; handshake = null; h.destroy()
                         check(webSocket.send(ByteString.of(*message3)))
@@ -242,11 +272,22 @@ class MuseConnection(
                         handle(WireCodec.decodeResponseEnvelope(plain))
                     }
                 }
-            } catch (_: Exception) { fail() }
+            } catch (error: Exception) { onDiagnostic("decode_failure_"+error.javaClass.simpleName);fail() }
         }
         override fun onMessage(webSocket: WebSocket, text: String) { fail() }
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { fail() }
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { fail() }
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            if(!closed) {
+                if(response?.code==401 || response?.code==403)authenticationRejected=true
+                onDiagnostic("websocket_failure_${response?.code ?: 0}_"+t.javaClass.simpleName)
+                if(response?.code==403) {
+                    val body=runCatching { response.peekBody(4096).string().lowercase() }.getOrDefault("")
+                    val categories=listOf("expired","invalid","forbidden","permission","rate","token","cloudflare").filter { it in body }
+                    onDiagnostic("gateway_reason_"+categories.joinToString("_").ifBlank { "unspecified" })
+                }
+                fail()
+            }
+        }
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { if(!closed) { onDiagnostic("websocket_closed_$code");fail() } }
     }
 
     private fun fail() {

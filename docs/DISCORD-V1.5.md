@@ -1,3 +1,5 @@
+> Historical V1.5 text. For current images and behavior, see [V2.0](RELEASE-V2.0.md). The original V1.5 kit remains attached to its release tag.
+
 **MUSE Gadget for Rabbit r1 — V1.5**
 
 I installed LineageOS and Muse on my Rabbit r1, then customized the app for everyday use. It’s based on Cameron Pak’s muse-r1 project, and I’ve now updated my version to V1.5.

@@ -161,7 +161,7 @@ class LibraryActivity : Activity() {
                     { }, { id,text,done -> runOnUiThread {
                         replies[id]=if(done && text.isNotEmpty()) text else replies.getOrDefault(id,"")+text
                         if(done && !result.isCompleted) result.complete(replies[id].orEmpty())
-                    } }, { })
+                    } }, { }, refreshDeviceId=app.store.identity.nodeId)
                 taskConnection=conn
                 state.text=t("Muse가 할 일을 정리 중…", "Museがタスクを整理中…", "Muse is extracting tasks…")
                 taskJob=scope.launch {

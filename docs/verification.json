@@ -1,67 +1,52 @@
 {
-  "version": "V1.5",
-  "date": "2026-10-06",
+  "version": "V2.0",
+  "date": "2026-10-07",
   "normal_apk_build": "passed",
   "offline_demo_apk_build": "passed",
-  "jvm_tests": 91,
+  "android_test_apk_build": "passed",
+  "jvm_tests": 116,
   "jvm_failures": 0,
   "lint": {
     "status": "failed",
     "errors": 15,
-    "warnings": 43,
+    "warnings": 46,
     "error_categories": {
       "MissingPermission": 13,
       "SuspiciousIndentation": 2
     }
   },
   "screenshots": {
-    "device": "Rabbit r1",
+    "status": "captured and visually reviewed",
+    "device": "Disposable Android 16 emulator, not physical Rabbit r1",
     "resolution": "480x640",
     "density": 200,
     "package": "dev.cameronpak.muser1.demo",
-    "data": "fictional offline fixtures including location, weather, battery, reminders",
+    "data": "fictional offline fixtures, simulated pet ages and needs",
     "internet_microphone_camera_location_permissions": false,
-    "individual_screens": 17,
-    "overview_sheets": 2
+    "individual_screens": 30,
+    "overview_sheets": 4
   },
   "normal_public_apk_installed_over_private_app": false,
   "live_muse_turns_or_elevenlabs_requests_during_publication": false,
-  "navigation": "not included; foreground location is used only for desk-clock weather",
-  "earlier_development_hardware_checks": [
-    "Side-button interruption and microphone capture without sending a Muse turn",
-    "Local reminder ringing and notification title",
-    "Charging clock automatic entry and tap-to-return",
-    "Weather icon, current humidity and hourly UV displayed on R1",
-    "Home battery state displayed on R1"
-  ],
-  "scope": "Publication checks build the public source and capture fixture UI. Earlier development checks used the private build; they do not constitute a new full public-build end-to-end test.",
-  "android_test_apk_build": "passed",
-  "latest_main_update": {
-    "features": [
-      "reactive avatar",
-      "camera treasure hunt",
-      "conversation partner",
-      "configurable clock idle delay"
+  "physical_r1_connection_restored": "not tested or claimed",
+  "navigation": "not included",
+  "security_review": "Candidate text files scanned for Google/GitHub/OpenAI keys, JWTs, private keys and personal local paths; no matches. Targeted check, not a complete security guarantee.",
+  "pet_lifecycle_instrumentation": {
+    "status": "passed",
+    "environment": "disposable unpaired Android 16 emulator",
+    "result": "PASS and INSTRUMENTATION_CODE -1",
+    "scope": [
+      "legacy migration and state persistence",
+      "toolbar order",
+      "hidden egg progress and moving frames",
+      "simulated incubation and hatching",
+      "six-food menu and three mini-games",
+      "five life stages",
+      "medicine and neglect/death",
+      "agent controls remain available after death",
+      "new-egg archival"
     ],
-    "normal_and_demo_build": "passed",
-    "jvm_tests": 94,
-    "jvm_failures": 0,
-    "lint_errors": {
-      "MissingPermission": 13,
-      "SuspiciousIndentation": 2
-    },
-    "live_photo_judgment_and_practice_response": "not tested",
-    "v1_5_release_tag_and_screenshots": "unchanged"
-  },
-  "network_and_banner_update": {
-    "builds": "debug and offline demo passed",
-    "jvm_tests": 94,
-    "lint_errors": {
-      "MissingPermission": 13,
-      "SuspiciousIndentation": 2
-    },
-    "device_evidence": "Private development build: LTE signal 4/4 with validated internet; unclipped hunt banner visually checked",
-    "wifi_switching": "not tested live",
-    "demo": "fixed fictional Wi-Fi signal; added Wi-Fi/basic-phone permissions removed"
+    "time": "simulated; not a real multi-day observation",
+    "microphone_or_live_muse_turns": false
   }
 }

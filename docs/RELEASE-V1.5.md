@@ -1,3 +1,5 @@
+> Historical V1.5 text. For current images and behavior, see [V2.0](RELEASE-V2.0.md). The original V1.5 kit remains attached to its release tag.
+
 # MUSE Gadget for Rabbit r1 — V1.5
 
 2026-10-06

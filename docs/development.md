@@ -1,6 +1,28 @@
 # Build and verification
 
-## Current publication: V1.5 (2026-10-06)
+## Current publication: V2.0 (2026-10-07)
+
+See [verification.json](verification.json) for executed V2.0 checks. Both normal and isolated offline-demo APKs and the Android-test APK build successfully. All 116 JVM tests pass. Lint retains 15 errors (13 MissingPermission and 2 SuspiciousIndentation) and 46 warnings; a successful build is not a clean lint result. All earlier sections below refer to their historical builds.
+
+The normal V2.0 APK is not installed on the personal R1 for this publication. New screenshots are native views from a disposable, unpaired Android 16 emulator configured to 480×640 / density 200 with no display cutout. They are not physical R1 captures. The offline demo has no Internet, location, microphone or camera permission; no live assistant or ElevenLabs calls are made. Pet stages use simulated age and fixed care values, not a multi-day observation.
+
+### Capture V2.0
+
+Build `:app:assembleDemo` and install only `dev.cameronpak.muser1.demo` in a disposable emulator. Remove any phone-specific cutout overlay and enable `wm set-ignore-orientation-request true` on that disposable emulator so Android 16 does not letterbox this portrait app. Do not alter your personal device's screen configuration.
+
+```sh
+python3 scripts/capture-demo.py --serial emulator-5554
+python3 scripts/make-showcase.py
+```
+
+Replace the serial with your disposable emulator's identifier. The capture script verifies the demo package is foreground. Pillow is needed for the contact sheets; NumPy is needed only to regenerate the bundled procedural audio. The kit is written under ignored `build/`. Sources and share images, not keyed APKs, are published.
+
+Demo scenes now also include `pet-egg`, `pet-baby`, `pet-adult`, `pet-food`, `pet-play`, `pet-music`, `pet-agent`, `quick`, `settings` and `reading`. Pet menu captures use actual taps after opening the fixture. Only the isolated demo responds to the fixture extras; the normal app uses saved state. Demo alarm saves and Wi-Fi-system entry are blocked.
+
+The V2.0 `petLifecycle` run passed with a PASS result and `INSTRUMENTATION_CODE: -1`. The opt-in `petLifecycle` instrumentation requires an unpaired disposable emulator and exercises migration, persistence, hidden progress, animated frames, simulated hatching/stages, food, games, illness, death and new-egg archiving. Never run the default instrumentation entry on a personal device: other modes may record audio or access an account.
+
+
+## Historical publication: V1.5 (2026-10-06)
 
 Normal and offline-demo APK builds passed; 91 JVM tests passed with no failures. The separate demo APK was installed on Rabbit r1 for refreshed screenshots with fictional data. The normal public APK was not installed over the user's private app. Lint still reports 15 errors (13 MissingPermission, 2 SuspiciousIndentation) in pre-existing pairing/recorder/cipher sources; this is not a clean lint result. See [verification.json](verification.json). Earlier entries below are historical checks, not the V1.5 test count.
 
@@ -92,7 +114,7 @@ The simplified inline alarm/timer forms were visually inspected on the 480×640 
 
 Publication lint: 15 existing errors / 38 warnings; no lint findings in the new Clock/LocalClock source files. General lint remains failing and is not represented as a passed check.
 
-### Recreate V1.5 sharing assets
+### Historical V1.5 sharing workflow
 
 After building and installing the separate demo APK on an authorized r1, run `python3 scripts/capture-demo.py`. It checks demo ownership and the expected clock/reminder scenes before capturing. Then run `python3 scripts/make-showcase.py` in a Python environment with Pillow installed. It writes the overview sheets into `docs/images` and the Discord kit into the ignored `build` directory. Only use fictional demo content for public captures.
 
