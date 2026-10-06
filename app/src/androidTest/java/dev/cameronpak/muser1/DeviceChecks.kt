@@ -36,6 +36,7 @@ import kotlin.math.sin
 /** Local hardware checks. No Muse network calls or account credentials are fabricated. */
 class DeviceChecks : Instrumentation() {
     private var embeddedMap = false
+    private var voiceDirections = false
     private var cloud = false
     private var voice = false
     private var visual = false
@@ -49,6 +50,7 @@ class DeviceChecks : Instrumentation() {
     private var expectedTranscript = "Please say the words Muse on Rabbit is working and nothing else."
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        voiceDirections = arguments?.getString("voiceDirections") == "true"
         embeddedMap = arguments?.getString("embeddedMap") == "true"
         cloud = arguments?.getString("cloud") == "true"
         voice = arguments?.getString("voice") == "true"
@@ -66,6 +68,7 @@ class DeviceChecks : Instrumentation() {
     override fun onStart() {
         val result = Bundle()
         try {
+            if (voiceDirections) { VoiceDirectionsCheck.run(this,result); finish(Activity.RESULT_OK,result); return }
             if (embeddedMap) { EmbeddedMapCheck.run(this, result); finish(Activity.RESULT_OK, result); return }
             if (volumeCheck) { volumeGestureCheck(result); finish(Activity.RESULT_OK, result); return }
             if (buttonCheck) { sideButtonCheck(result); finish(Activity.RESULT_OK, result); return }

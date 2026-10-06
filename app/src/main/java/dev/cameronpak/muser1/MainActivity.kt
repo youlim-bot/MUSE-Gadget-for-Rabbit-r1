@@ -503,6 +503,19 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun openVoiceDirections(text:String):Boolean {
+        val command=VoiceDirections.parse(text,activeLanguageMode.interpreting)?:return false
+        sending=false;transcriptPending=false;turnTimeout?.cancel()
+        stopContinuous(false)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val notice=if(command.transit) UiText.text(this,"일본 대중교통 경로는 아직 지원하지 않습니다.","日本の公共交通ルートはまだ対応していません。","Transit routes in Japan are not supported yet.")
+            else UiText.text(this,"길찾기에서 목적지 후보를 선택해 주세요.","ルート検索で目的地候補を選択してください。","Choose a destination match in Directions.")
+        activeTurn?.replies?.set("local-directions",notice);historyStore.save(history);renderConversation();updateStatus("READY")
+        if(command.transit) AlertDialog.Builder(this).setMessage(notice).setPositiveButton(tr("닫기"),null).show()
+        else startActivity(Intent(this,NavigationActivity::class.java).putExtra("destination_query",command.query).putExtra("travel_mode",command.mode.name))
+        return true
+    }
+
     private fun receiveTranscript(text: String) {
         val current = activeTurn ?: return
         current.user = text
@@ -734,6 +747,7 @@ class MainActivity : Activity() {
                     ensureActive()
                     if (connection !== current || turn != thisTurn) return@launch
                     receiveTranscript(text)
+                    if (openVoiceDirections(text)) return@launch
                     updateStatus("MUSE에 전송 중")
                     withContext(Dispatchers.IO) { checkNotNull(current).sendText(activeLanguageMode.message(text)) }
                 } else {

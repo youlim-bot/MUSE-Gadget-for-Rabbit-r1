@@ -70,3 +70,7 @@ Source-only public builds use `MUSE_MAPS_SDK_KEY=''` and the offline demo always
 ### Google Routes integration (2026-10-06)
 
 78 JVM tests pass. WALK and DRIVE API responses and embedded map rendering passed on the physical r1 using public-landmark coordinates; mode changes cleared the old route. The route key was encrypted and its staging file absent. Wrong Android app identity was rejected with HTTP 403. The final route-start wording adjustment was installed and visually checked after USB reconnected. Current-location routing to the user-selected Akebonobashi Station was checked in Walk and Drive on the device; reported location accuracy was about 100 m. Actual outdoor movement remains unverified. Credentials, history and saved library hashes remained unchanged. Lint still fails (15 errors, 39 warnings). Earlier test/count notes above are historical.
+
+### Voice directions (2026-10-06)
+
+86 JVM tests pass. A synthetic Japanese command opened Drive mode and destination candidates on the physical r1; the taller address field stayed fully visible with the keyboard confirmed visible. Microphone-to-route end-to-end recognition is not yet verified. Existing credentials, history, library and encrypted Routes key were preserved. No microphone or Muse message was used in this check.

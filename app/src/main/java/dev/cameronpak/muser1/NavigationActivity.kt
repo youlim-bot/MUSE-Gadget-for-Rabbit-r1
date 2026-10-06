@@ -45,6 +45,7 @@ class NavigationActivity : Activity() {
     private var active=false
     private var pageReady=false
     private var asked=false
+    private var pendingVoiceSearch=false
     private var busy=false
     private var generation=0
     private var call: Call? = null
@@ -73,13 +74,22 @@ class NavigationActivity : Activity() {
 
     override fun onCreate(state:Bundle?){
         super.onCreate(state)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        mode=if(intent.getStringExtra("travel_mode")=="DRIVE")TravelMode.DRIVE else TravelMode.WALK
         runCatching { routesStore.importPending() }
         window.decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(10,13,11))}
         val top=row();top.item(button("‹ Muse"){finish()},.8f);top.item(label(16f).apply{text=t("길찾기","ルート検索","Directions")},1.6f);top.item(button(t("정보","情報","Info")){info()},.7f);root.addView(top)
         destination=EditText(this).apply{hint=t("목적지 이름·주소","目的地の名前・住所","Destination name/address");textSize=14f;setTextColor(Color.WHITE);setHintTextColor(Color.LTGRAY);setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(300));imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH;setOnEditorActionListener{_,_,_->findDestination();true}}
         search=button(t("찾기","検索","Find")){findDestination()}
-        val input=row();input.item(destination,3f);input.item(search,.7f);root.addView(input)
+        val input=row().apply{setPadding(dp(10),dp(8),dp(10),dp(8))}
+        destination.minHeight=dp(48);destination.gravity=Gravity.CENTER_VERTICAL
+        destination.setPadding(dp(10),dp(4),dp(10),dp(4))
+        destination.background=GradientDrawable().apply{setColor(Color.rgb(28,31,28));cornerRadius=dp(12).toFloat();setStroke(dp(1),Color.rgb(80,81,70))}
+        input.addView(destination,LinearLayout.LayoutParams(0,dp(48),3f).apply{rightMargin=dp(6)})
+        input.addView(search,LinearLayout.LayoutParams(0,dp(48),.7f));root.addView(input)
+        intent.getStringExtra("destination_query")?.take(200)?.takeIf{it.isNotBlank()}?.let{destination.setText(it);pendingVoiceSearch=true}
+        root.isFocusableInTouchMode=true;root.requestFocus()
         val modes=row()
         for(option in TravelMode.entries){val control=button(if(option==TravelMode.WALK)t("도보","徒歩","Walk")else t("자동차","車","Drive")){selectMode(option)};modeButtons[option]=control;modes.item(control)}
         modes.item(button(t("대중교통","公共交通","Transit")){AlertDialog.Builder(this).setTitle(t("일본 대중교통","日本の公共交通","Japan transit")).setMessage(t("Google Routes API는 일본 대중교통을 제공하지 않습니다. 별도 교통 API 연결 후 사용할 수 있습니다.","Google Routes APIは日本の公共交通に対応していません。別途交通APIの連携が必要です。","Google Routes API does not provide transit routes in Japan. A separate transit provider is required.")).setPositiveButton(UiText.translate(this,"닫기"),null).show()}.apply{alpha=.5f})
@@ -145,6 +155,7 @@ class NavigationActivity : Activity() {
         fix=Location(location);handler.removeCallbacks(timeout)
         status.text=t("현재 위치 · 정확도 약 ${location.accuracy.toInt()}m","現在地・精度 約${location.accuracy.toInt()}m","Current location · accuracy ~${location.accuracy.toInt()}m")
         updatePosition()
+        if(pendingVoiceSearch){pendingVoiceSearch=false;destination.post{if(active)findDestination()else pendingVoiceSearch=true}}
     }
     private fun stopLocation(){handler.removeCallbacks(timeout);try{manager.removeUpdates(listener)}catch(_:SecurityException){}}
     override fun onRequestPermissionsResult(code:Int,permissions:Array<out String>,grants:IntArray){super.onRequestPermissionsResult(code,permissions,grants);if(code==81)locate()}
