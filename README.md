@@ -62,4 +62,4 @@ Firmware flashing wipes data and may prevent booting. Follow the guide's firmwar
 
 ## License
 
-First-party code/docs: [MIT](LICENSE), preserving Cameron Pak's notice. Vendored protocol and cryptography files retain their own licenses and provenance. The public geometric avatar is original to this export; the upstream/private reference avatars are not distributed. See [CREDITS](CREDITS.md).
+First-party code/docs: [MIT](LICENSE), preserving Cameron Pak's notice. Vendored protocol and cryptography files retain their own licenses and provenance. The public build restores the original upstream Muse r1 avatar; the illustration is not covered by the code MIT license. Private dolphin/reference images are not distributed. See [CREDITS](CREDITS.md).

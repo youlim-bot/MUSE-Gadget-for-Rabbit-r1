@@ -529,7 +529,7 @@ internal class MuseScreen(
         var compact = 0f
         var phase = Phase.QUIET
             set(value) { field = value; invalidate() }
-        private val bitmap = BitmapFactory.decodeResource(resources, R.drawable.muse_public_avatar)
+        private val bitmap = BitmapFactory.decodeResource(resources, R.drawable.muse_character)
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         private val image = RectF()
         private val source = Rect()

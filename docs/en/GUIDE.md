@@ -175,7 +175,7 @@ For poor recognition, compare the exact spoken and recognized phrase, allow micr
 | Search | Searches locally displayed questions/answers and saved items; space-separated terms must all match. It does not search all remote Muse history. |
 | Voice memo | Quick questions → Voice memos → Record (up to 20s) → transcribe with ElevenLabs → edit/save text locally. No audio archive and no automatic Muse submission. |
 | Memo to tasks | Open saved memo → Make to-dos → confirm sending memo to Muse → review one task per line → Save list. Up to 50 tasks; original memo remains. Completion checks persist. No reminders/calendar integration. |
-| Avatar | This public build includes an original geometric avatar. The owner's custom dolphin was a local image adaptation, not automatic account-avatar synchronization. Replace the drawable only with an asset you can distribute. |
+| Avatar | This public build uses the original upstream Muse r1 avatar (see the artwork notice in CREDITS). The owner's custom dolphin was a local image adaptation, not automatic account-avatar synchronization. Replace the drawable only with an asset you can distribute. |
 
 ## 9. LTE and troubleshooting
 

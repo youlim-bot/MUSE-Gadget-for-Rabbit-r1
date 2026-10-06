@@ -7,11 +7,16 @@ parser.add_argument('--output',default=str(Path(__file__).resolve().parents[1]/'
 out=Path(parser.parse_args().output);out.mkdir(parents=True,exist_ok=True)
 def shell(*a):return subprocess.check_output(adb+['shell',*a],timeout=25)
 def nodes():
- shell('uiautomator','dump','/data/local/tmp/muse-demo.xml')
- data=shell('cat','/data/local/tmp/muse-demo.xml');shell('rm','/data/local/tmp/muse-demo.xml')
- rows=list(E.fromstring(data).iter('node'))
- assert any(n.get('package')==pkg for n in rows),'Demo is not foreground; refusing capture'
- return rows
+ for attempt in range(3):
+  shell('input','keyevent','224')
+  shell('uiautomator','dump','/data/local/tmp/muse-demo.xml')
+  result=subprocess.run(adb+['shell','cat','/data/local/tmp/muse-demo.xml'],capture_output=True,timeout=25)
+  shell('rm','-f','/data/local/tmp/muse-demo.xml')
+  if result.returncode==0:
+   rows=list(E.fromstring(result.stdout).iter('node'))
+   if any(n.get('package')==pkg for n in rows):return rows
+  time.sleep(.5)
+ raise RuntimeError('Demo is not foreground; refusing capture')
 def tap(label):
  n=None
  for _ in range(4):
@@ -28,6 +33,7 @@ def capture(name):
  (out/(name+'.png')).write_bytes(image)
  print('Saved',name,flush=True)
 for lang,scene in [('EN','chat'),('KO','chat'),('JA','chat'),('EN','translate'),('KO','translate'),('EN','photo'),('EN','languages'),('EN','tasks'),('KO','tasks'),('EN','settings')]:
+ shell('input','keyevent','224')
  shell('am','force-stop',pkg)
  shell('am','start','-n',pkg+'/dev.cameronpak.muser1.MainActivity','--es','demo_language',lang,'--es','demo_scene',scene)
  time.sleep(1)

@@ -17,6 +17,8 @@ Current lint: **15 errors / 36 warnings** (13 permission-analysis errors and 2 v
 
 No GitHub Actions workflow is enabled: builds/tests run locally, avoiding runner use. Existing upstream instrumentation is retained for reference but has not been rerun in this export, and may require adaptation for the customized layout. Never run its default/live recording modes on a personal device just to capture pictures.
 
+The subsequent avatar refresh restores the original upstream `muse_character.png` byte-for-byte, rebuilds both APK variants, and recaptures the offline gallery. JVM tests were not rerun for this artwork/documentation-only refresh. See CREDITS for the artwork license boundary.
+
 ## Offline demo and screenshots
 
 ```sh

@@ -29,7 +29,7 @@ References used during investigation: [firmware guide](https://github.com/TurboT
 | Interpretation | KO/JA/EN input/target, direction swap, continuous sentence turns | Not simultaneous streaming; input row appears only in Translate mode. |
 | Interface | Smaller controls, language flags, quiet mode, adjustable body text and speech speed | Persistent settings were checked on-device. Some legacy status/error strings are not fully localized. |
 | Camera | Front/back camera, capture/review/save, photo question, text translation, last-photo follow-up | Camera selection physically rotated the unit. Wheel control and live visual answers need further hands-on/end-to-end checks. |
-| Keyboard/avatar | Android IME support, custom local avatar, size adjustments | KO/JA/EN keyboard selection was configured on the owner's device. Account-avatar auto-sync was not implemented. Public export uses a new geometric asset. |
+| Keyboard/avatar | Android IME support, custom local avatar, size adjustments | KO/JA/EN keyboard selection was configured on the owner's device. Account-avatar auto-sync was not implemented. Public export restores the original upstream Muse r1 avatar. |
 | Library | Favorites, local search, voice-to-text memo | Memo capture is at most 20s; saved content is text, not an audio archive. |
 | Tasks/settings | Reviewed memo-to-task extraction, checklist completion, 18–26sp and 0.75–1.5× | Source tests and settings persistence checked; live task quality and listening comparison remain user tests. |
 

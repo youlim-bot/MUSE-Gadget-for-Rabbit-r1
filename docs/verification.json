@@ -24,5 +24,11 @@
   "normal_public_apk_installed_over_private_app": false,
   "live_muse_turns_or_elevenlabs_requests_during_publication": false,
   "private_credentials_history_library_unchanged": true,
-  "provisioning_script": "syntax + offline success-path mock; no live account validation"
+  "provisioning_script": "syntax + offline success-path mock; no live account validation",
+  "avatar_refresh": {
+    "asset": "original upstream muse_character.png",
+    "matches_upstream_bytes": true,
+    "debug_and_demo_builds": "passed",
+    "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
+  }
 }
