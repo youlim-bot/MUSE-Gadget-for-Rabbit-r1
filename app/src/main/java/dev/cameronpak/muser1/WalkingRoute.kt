@@ -6,8 +6,8 @@ import kotlin.math.*
 internal data class MapPoint(val lat: Double, val lon: Double) {
     init { require(lat.isFinite() && lon.isFinite() && lat in -90.0..90.0 && lon in -180.0..180.0) }
 }
-internal data class WalkingStep(val point: MapPoint, val type: String, val modifier: String, val name: String)
-internal data class FootRoute(val points: List<MapPoint>, val steps: List<WalkingStep>, val meters: Double, val seconds: Double) {
+internal data class WalkingStep(val point: MapPoint, val type: String, val modifier: String, val name: String, val instruction: String = "")
+internal data class FootRoute(val points: List<MapPoint>, val steps: List<WalkingStep>, val meters: Double, val seconds: Double, val warnings: List<String> = emptyList()) {
     val geometryLength by lazy { points.zipWithNext().sumOf { WalkingRoute.distance(it.first,it.second) } }
     val stepOffsets by lazy { steps.map { WalkingRoute.projected(points,it.point).first } }
 }

@@ -2,12 +2,12 @@
   "date": "2026-10-06",
   "normal_apk_build": "passed",
   "offline_demo_apk_build": "passed",
-  "jvm_tests": 73,
+  "jvm_tests": 78,
   "jvm_failures": 0,
   "lint": {
     "status": "failed",
     "errors": 15,
-    "warnings": 40,
+    "warnings": 39,
     "error_categories": {
       "MissingPermission": 13,
       "SuspiciousIndentation": 2
@@ -32,7 +32,7 @@
     "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
   },
   "walking_navigation": {
-    "implementation": "native Google Maps SDK + Android Geocoder + FOSSGIS pedestrian OSRM",
+    "implementation": "native Google Maps SDK + Android Geocoder + Google Routes WALK/DRIVE",
     "private_apk_installed": true,
     "public_landmark_live_route_verified": true,
     "native_geocoder_verified": true,
@@ -48,8 +48,10 @@
     "map_loaded": true,
     "owner_key_in_public_source": false,
     "owner_key_in_public_apks": false,
-    "google_routes_api_connected": false,
-    "driving_mode_ready": false,
-    "japan_transit_ready": false
+    "google_routes_api_connected": true,
+    "driving_mode_ready": true,
+    "japan_transit_ready": false,
+    "final_route_start_wording_installed": true,
+    "current_location_walk_drive_search_verified": true
   }
 }

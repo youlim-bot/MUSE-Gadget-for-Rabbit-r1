@@ -15,6 +15,9 @@ import android.view.*
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -31,9 +34,14 @@ class NavigationActivity : Activity() {
     private lateinit var instruction: TextView
     private lateinit var destination: EditText
     private lateinit var search: Button
+    private val routesStore by lazy { RoutesKeyStore(this) }
+    private var mode=TravelMode.WALK
+    private val modeButtons=mutableMapOf<TravelMode,Button>()
+    private lateinit var warning:TextView
     private var fix: Location? = null
     private var selected: MapPoint? = null
     private var route: FootRoute? = null
+    private var routeOrigin: MapPoint? = null
     private var active=false
     private var pageReady=false
     private var asked=false
@@ -65,17 +73,22 @@ class NavigationActivity : Activity() {
 
     override fun onCreate(state:Bundle?){
         super.onCreate(state)
+        runCatching { routesStore.importPending() }
         window.decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(10,13,11))}
-        val top=row();top.item(button("‹ Muse"){finish()},.8f);top.item(label(16f).apply{text=t("도보 지도","徒歩マップ","Walking map")},1.6f);top.item(button(t("정보","情報","Info")){info()},.7f);root.addView(top)
+        val top=row();top.item(button("‹ Muse"){finish()},.8f);top.item(label(16f).apply{text=t("길찾기","ルート検索","Directions")},1.6f);top.item(button(t("정보","情報","Info")){info()},.7f);root.addView(top)
         destination=EditText(this).apply{hint=t("목적지 이름·주소","目的地の名前・住所","Destination name/address");textSize=14f;setTextColor(Color.WHITE);setHintTextColor(Color.LTGRAY);setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(300));imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH;setOnEditorActionListener{_,_,_->findDestination();true}}
         search=button(t("찾기","検索","Find")){findDestination()}
         val input=row();input.item(destination,3f);input.item(search,.7f);root.addView(input)
+        val modes=row()
+        for(option in TravelMode.entries){val control=button(if(option==TravelMode.WALK)t("도보","徒歩","Walk")else t("자동차","車","Drive")){selectMode(option)};modeButtons[option]=control;modes.item(control)}
+        modes.item(button(t("대중교통","公共交通","Transit")){AlertDialog.Builder(this).setTitle(t("일본 대중교통","日本の公共交通","Japan transit")).setMessage(t("Google Routes API는 일본 대중교통을 제공하지 않습니다. 별도 교통 API 연결 후 사용할 수 있습니다.","Google Routes APIは日本の公共交通に対応していません。別途交通APIの連携が必要です。","Google Routes API does not provide transit routes in Japan. A separate transit provider is required.")).setPositiveButton(UiText.translate(this,"닫기"),null).show()}.apply{alpha=.5f})
+        root.addView(modes);styleModes()
         status=label(11f).apply{text=t("현재 위치 확인 중…","現在地を取得中…","Finding your location…")};root.addView(status,LinearLayout.LayoutParams(-1,dp(24)))
         map=GoogleMapCanvas(this).apply {
             ready={pageReady=true;if(fresh(fix))updatePosition();route?.let{draw(it)}}
             choose={p->if(active&&!busy)AlertDialog.Builder(this@NavigationActivity)
-                .setMessage(t("이 지점까지 도보 경로를 표시할까요?","この地点までの徒歩ルートを表示しますか？","Show a walking route to this point?"))
+                .setMessage(t("선택한 이동수단으로 이 지점까지 경로를 표시할까요?","選択した移動手段でこの地点まで表示しますか？","Show a route to this point with the selected travel mode?"))
                 .setPositiveButton(t("경로 보기","ルート表示","Show route")){_,_->destination.setText(t("지도에서 선택한 지점","地図で選択した地点","Point selected on map"));requestRoute(p)}
                 .setNegativeButton(UiText.translate(this@NavigationActivity,"취소"),null).show()}
             create(state?.getBundle("google_map"))
@@ -84,9 +97,20 @@ class NavigationActivity : Activity() {
         instruction=label(13f).apply{maxLines=2;text=t("목적지 검색 또는 지도를 길게 누르세요","目的地を検索、または地図を長押し","Search a destination or hold a point on the map");setOnClickListener{showSteps()}}
         root.addView(instruction,LinearLayout.LayoutParams(-1,dp(48)))
         val controls=row();controls.item(button(t("내 위치","現在地","Locate")){if(fresh(fix))map.center()else locate()});controls.item(button(t("전체 경로","全ルート","Overview")){route?.let{draw(it)}});controls.item(button(t("재탐색","再検索","Reroute")){selected?.let{requestRoute(it)}?:findDestination()});root.addView(controls)
-        root.addView(label(9f).apply { text="Route © OpenStreetMap · FOSSGIS/OSRM";setOnClickListener{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://routing.openstreetmap.de/about.html")))} },LinearLayout.LayoutParams(-1,dp(18)))
+        warning=label(10f).apply { maxLines=2;setTextColor(Color.rgb(225,196,146));setOnClickListener{showWarnings()} }
+        root.addView(warning,LinearLayout.LayoutParams(-1,-2));updateWarning()
         setContentView(root)
     }
+    private fun styleModes(){modeButtons.forEach{(value,button)->button.isSelected=value==mode;button.setTextColor(if(value==mode)Color.BLACK else Color.rgb(255,166,58));(button.background as GradientDrawable).setColor(if(value==mode)Color.rgb(255,152,31)else Color.rgb(28,31,28))}}
+    private fun selectMode(value:TravelMode){if(mode==value)return;cancelRequest();mode=value;route=null;map.clearRoute();styleModes();updateWarning();selected?.let{requestRoute(it)}}
+    private fun notices():String {
+        val beta=if(mode==TravelMode.WALK)t("도보 경로는 베타입니다. 인도·보행로가 누락될 수 있습니다.","徒歩ルートはベータ版です。歩道・歩行者用通路がない場合があります。","Walking routes are in beta. Sidewalks or pedestrian paths may be missing.")else t("교통상황 미반영 · 화면 안내 전용","交通状況未反映・画面案内のみ","Traffic not included · visual guidance only")
+        return (listOf(beta)+route?.warnings.orEmpty()).filter{it.isNotBlank()}.distinct().joinToString("\n")
+    }
+    private fun updateWarning(){if(!::warning.isInitialized)return;warning.text=notices();warning.visibility=if(warning.text.isBlank())View.GONE else View.VISIBLE}
+    private fun showWarnings(){if(notices().isNotBlank())AlertDialog.Builder(this).setMessage(notices()).setPositiveButton(UiText.translate(this,"닫기"),null).show()}
+    @Suppress("DEPRECATION")
+    private fun signingDigest():String {val info=packageManager.getPackageInfo(packageName,PackageManager.GET_SIGNING_CERTIFICATES);val cert=info.signingInfo!!.apkContentsSigners.first().toByteArray();return MessageDigest.getInstance("SHA-1").digest(cert).joinToString(""){"%02X".format(it.toInt()and 255)}}
     private fun updatePosition(){val l=fix?:return;map.position(point(l),l.accuracy);updateGuidance()}
     private fun draw(r:FootRoute){map.draw(r)}
     override fun onStart(){super.onStart();map.start()}
@@ -152,22 +176,28 @@ class NavigationActivity : Activity() {
     }
     private fun requestRoute(end:MapPoint){
         if(busy)return
+        val key=runCatching{routesStore.read()}.getOrNull()
+        if(key.isNullOrBlank()){instruction.text=t("Routes API 키 등록이 필요합니다","Routes APIキーを設定してください","Configure a Routes API key first");return}
         val origin=fix
         if(!fresh(origin)){locate();instruction.text=t("현재 위치 확인 후 재탐색을 누르세요","現在地取得後、再検索してください","Wait for location, then tap Reroute");selected=end;return}
         val now=SystemClock.elapsedRealtime()
         synchronized(rateLock){if(now-lastRouteRequest<1500){instruction.text=t("잠시 후 다시 시도하세요","少し待って再試行してください","Please wait a moment and retry");return};lastRouteRequest=now}
-        selected=end;route=null;map.clearRoute()
-        val token=begin();instruction.text=t("도보 경로 계산 중…","徒歩ルートを計算中…","Calculating walking route…")
-        val request=Request.Builder().url(WalkingRoute.routeUrl(point(origin!!),end)).header("User-Agent",WalkingRoute.USER_AGENT).build()
+        selected=end;route=null;routeOrigin=point(origin!!);map.clearRoute()
+        val token=begin();instruction.text=t("경로 계산 중…","ルートを計算中…","Calculating route…")
+        val language=when(UiText.language(this)){DisplayLanguage.KO->"ko";DisplayLanguage.JA->"ja";else->"en"}
+        val request=Request.Builder().url(GoogleRoutes.ENDPOINT).header("X-Goog-Api-Key",key).header("X-Goog-FieldMask",GoogleRoutes.FIELDS)
+            .header("X-Android-Package",packageName).header("X-Android-Cert",signingDigest())
+            .post(GoogleRoutes.body(point(origin!!),end,mode,language).toRequestBody("application/json".toMediaType())).build()
         val pending=client.newCall(request);call=pending
         worker.execute{
-            val result=runCatching{pending.execute().use{response->check(response.isSuccessful);val body=response.body?:error("Empty response");check(body.contentLength()<=4_000_000);// Bound the response in memory; never log URLs or bodies.
-                val buffer=java.io.ByteArrayOutputStream();val chunk=ByteArray(8192);body.byteStream().use{input->while(true){val n=input.read(chunk);if(n<0)break;check(buffer.size()+n<=4_000_000);buffer.write(chunk,0,n)}};WalkingRoute.parse(buffer.toString("UTF-8"))}}
-            complete(token){result.onSuccess{route=it;draw(it);updateGuidance()}.onFailure{instruction.text=t("도보 경로를 찾지 못했습니다 · 재탐색","徒歩ルートを取得できません・再検索","Walking route unavailable · retry")}}
+            val result=runCatching{pending.execute().use{response->if(!response.isSuccessful)throw RoutesHttpException(response.code);val body=response.body?:error("Empty response");check(body.contentLength()<=4_000_000);// Bound the response in memory; never log URLs or bodies.
+                val buffer=java.io.ByteArrayOutputStream();val chunk=ByteArray(8192);body.byteStream().use{input->while(true){val n=input.read(chunk);if(n<0)break;check(buffer.size()+n<=4_000_000);buffer.write(chunk,0,n)}};GoogleRoutes.parse(buffer.toString("UTF-8"))}}
+            complete(token){result.onSuccess{route=it;draw(it);updateWarning();updateGuidance()}.onFailure{instruction.text=if(it is RoutesHttpException)t("경로 조회 오류 HTTP ${it.status} · API 설정 확인","ルート取得エラー HTTP ${it.status}・API設定確認","Routes HTTP ${it.status} · check API setup")else t("경로를 찾지 못했습니다 · 재탐색","ルートを取得できません・再検索","Route unavailable · retry")}}
         }
     }
     private fun measure(m:Double)=if(m<1000)"${ceil(m/10).toInt()*10} m" else String.format(Locale.US,"%.1f km",m/1000)
     private fun stepText(s:WalkingStep):String{
+        if(s.instruction.isNotBlank())return s.instruction
         val action=when(s.type){
             "arrive"->t("목적지 도착","目的地に到着","Arrive at destination")
             "depart"->t("출발","出発","Start walking")
@@ -180,17 +210,20 @@ class NavigationActivity : Activity() {
         val r=route?:return;val l=fix?:return;if(!fresh(l))return
         val progress=WalkingRoute.progress(r,point(l))
         instruction.text=when{
+            progress.offRoute>maxOf(60.0,l.accuracy.toDouble()*2) && routeOrigin?.let{WalkingRoute.distance(point(l),it)<maxOf(60.0,l.accuracy.toDouble()*2)}==true ->
+                t("경로 ${measure(r.meters)} · 약 ${ceil(r.seconds/60).toInt().coerceAtLeast(1)}분", "ルート ${measure(r.meters)}・約${ceil(r.seconds/60).toInt().coerceAtLeast(1)}分", "Route ${measure(r.meters)} · ~${ceil(r.seconds/60).toInt().coerceAtLeast(1)} min")+"\n"+
+                t("경로 시작점까지 직선 ${measure(WalkingRoute.distance(point(l),r.points.first()))}","ルート開始点まで直線 ${measure(WalkingRoute.distance(point(l),r.points.first()))}","Route start: ${measure(WalkingRoute.distance(point(l),r.points.first()))} straight-line")
             progress.offRoute>maxOf(60.0,l.accuracy.toDouble()*2)->t("경로에서 벗어남 · 재탐색을 누르세요","ルートから外れました・再検索","Off route · tap Reroute")
             progress.remaining<35 && WalkingRoute.distance(point(l),selected?:r.points.last())<35 && l.accuracy<=40 ->t("목적지 근처입니다","目的地付近です","Near your destination")
             else->{val minutes=ceil(r.seconds*(progress.remaining/r.meters.coerceAtLeast(1.0))/60).toInt().coerceAtLeast(1);val next=progress.next
                 t("남은 ${measure(progress.remaining)} · 약 ${minutes}분","残り ${measure(progress.remaining)}・約${minutes}分","${measure(progress.remaining)} left · ~${minutes} min")+"\n"+(if(next!=null)"${measure(progress.toNext)} · ${stepText(next)}" else t("목적지 방향으로 이동","目的地へ進む","Continue toward destination"))}
         }
     }
-    private fun showSteps(){route?.let{r->AlertDialog.Builder(this).setTitle(t("도보 경로 안내","徒歩ルート案内","Walking directions")).setItems(r.steps.map{stepText(it)}.toTypedArray(),null).setPositiveButton(UiText.translate(this,"닫기"),null).show()}}
-    private fun info(){AlertDialog.Builder(this).setTitle(t("Muse 도보 지도","Muse 徒歩マップ","Muse walking map")).setMessage(t(
-        "지도: Google Maps · 경로: FOSSGIS/OSRM. 검색어는 Android 검색 제공자에게, 경로 요청 시 출발·목적지 좌표는 FOSSGIS에 전달됩니다. 지도 서비스는 표시 지역과 IP를 받습니다. 서비스 로그가 남을 수 있습니다. Muse AI에는 보내지 않습니다. 화면을 벗어나면 위치 추적을 멈춥니다.\n\n지도 길게 누르기로 목적지를 선택할 수 있습니다. 화면 안내 전용이며 음성·백그라운드 안내와 자동 재탐색은 없습니다.",
-        "地図: Google Maps・ルート: FOSSGIS/OSRM。検索語はAndroid検索プロバイダーへ、ルート要求時の出発地・目的地座標はFOSSGISへ送信します。地図サービスは表示地域とIPを受け取り、ログを保存する場合があります。Muse AIには送りません。画面を離れると位置取得を停止します。\n\n地図を長押しして目的地を選べます。画面案内のみ。音声・バックグラウンド案内、自動再検索はありません。",
-        "Map: Google Maps · routes: FOSSGIS/OSRM. Search text goes to the Android geocoder; route requests send start/destination coordinates to FOSSGIS. Map services receive the viewed area and IP and may retain logs. Nothing is sent to Muse AI. Tracking stops when you leave this screen.\n\nHold a map point to choose it. Visual guidance only; no voice, background navigation or automatic rerouting."))
+    private fun showSteps(){route?.let{r->AlertDialog.Builder(this).setTitle(t("경로 안내","ルート案内","Directions")).setItems(r.steps.map{stepText(it)}.toTypedArray(),null).setPositiveButton(UiText.translate(this,"닫기"),null).show()}}
+    private fun info(){AlertDialog.Builder(this).setTitle(t("Muse 길찾기","Muse ルート検索","Muse directions")).setMessage(t(
+        "지도: Google Maps · 경로: Google Routes API. 검색어는 Android 검색 제공자에게, 경로 요청 시 출발·목적지 좌표는 Google에 전달됩니다. 지도 서비스는 표시 지역과 IP를 받습니다. 서비스 로그가 남을 수 있습니다. Muse AI에는 보내지 않습니다. 화면을 벗어나면 위치 추적을 멈춥니다.\n\n지도 길게 누르기로 목적지를 선택할 수 있습니다. 도보·자동차 경로를 지원합니다. 일본 대중교통은 별도 API가 필요합니다. 화면 안내 전용이며 음성·백그라운드 안내와 자동 재탐색은 없습니다.",
+        "地図: Google Maps・ルート: Google Routes API。検索語はAndroid検索プロバイダーへ、ルート要求時の出発地・目的地座標はGoogleへ送信します。地図サービスは表示地域とIPを受け取り、ログを保存する場合があります。Muse AIには送りません。画面を離れると位置取得を停止します。\n\n地図を長押しして目的地を選べます。徒歩・車に対応します。日本の公共交通には別のAPIが必要です。画面案内のみ。音声・バックグラウンド案内、自動再検索はありません。",
+        "Map: Google Maps · routes: Google Routes API. Search text goes to the Android geocoder; route requests send start/destination coordinates to Google. Map services receive the viewed area and IP and may retain logs. Nothing is sent to Muse AI. Tracking stops when you leave this screen.\n\nHold a map point to choose it. Walking and driving supported. Japan transit requires another API. Visual guidance only; no voice, background navigation or automatic rerouting."))
         .setPositiveButton(UiText.translate(this,"닫기"),null).setNeutralButton(t("위치 설정","位置設定","Location settings")){_,_->startActivity(Intent(if(permitted())Settings.ACTION_LOCATION_SOURCE_SETTINGS else Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply{if(!permitted())data=Uri.parse("package:$packageName")} )}.show()}
     companion object { private val rateLock=Any();private var lastRouteRequest=Long.MIN_VALUE/2 }
 }

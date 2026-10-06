@@ -56,3 +56,7 @@ Online map test on Rabbit r1. The origin and destination are public-landmark fix
 ![Native Google map inside Muse](images/ko-google-map.png)
 
 Actual r1 capture with synthetic public-landmark origin/destination. Google map loading was verified with a locally configured restricted SDK key. The orange walking route still comes from FOSSGIS/OSRM. No key or keyed APK is published.
+
+## Google Routes mode selection
+
+[Walk](images/ko-google-walk.png) · [Drive](images/ko-google-drive.png). Physical r1 captures using synthetic public-landmark coordinates (Tokyo Station → Tokyo International Forum); no owner location, account, or conversation data. Route requests use live Google Routes API. These captures are separate from the offline demo.

@@ -37,9 +37,19 @@ internal object EmbeddedMapCheck {
             test.runOnMainSync{(field("status").get(app) as android.widget.TextView).text="DEMO · Public landmark route"}
             test.waitForIdleSync()
             Thread.sleep(750)
-            val bitmap=test.uiAutomation.takeScreenshot()?:error("No screenshot")
-            File(test.targetContext.cacheDir,"embedded-map-fixture.png").outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
-            result.putString("stream","PASS: native Google Maps SDK loaded map tiles, public-landmark walking route and position; native geocoder returned results. Synthetic origin only; no Muse message or audio. Outdoor movement not tested.")
+            fun capture(name:String){
+                var safe=false;test.runOnMainSync{safe=(field("fix").get(app) as Location).provider=="public-landmark-fixture"};check(safe)
+                val bitmap=test.uiAutomation.takeScreenshot()?:error("No screenshot")
+                File(test.targetContext.cacheDir,name).outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
+            }
+            capture("embedded-map-fixture.png")
+            Thread.sleep(1600)
+            test.runOnMainSync{method("selectMode",TravelMode::class.java).invoke(app,TravelMode.DRIVE);check(field("route").get(app)==null)}
+            await{var ready=false;test.runOnMainSync{ready=field("route").get(app)!=null && field("mode").get(app)==TravelMode.DRIVE};ready}
+            test.waitForIdleSync();Thread.sleep(750);capture("google-drive-fixture.png")
+            check(File(test.targetContext.noBackupFilesDir,"google-routes.enc").isFile)
+            check(!File(test.targetContext.filesDir,"pending-google-routes-key").exists())
+            result.putString("stream","PASS: native Google map, WALK and DRIVE Google Routes responses rendered; mode switch cleared old route; native geocoder returned results; route key encrypted and provisioning file absent. Synthetic public landmarks only; no Muse message/audio. Outdoor movement not tested.")
         }finally{test.runOnMainSync{app.finish()}}
     }
 }

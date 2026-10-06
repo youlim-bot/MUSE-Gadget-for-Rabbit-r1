@@ -278,7 +278,7 @@ class MainActivity : Activity() {
             UiText.text(this, "음성 메모", "音声メモ", "Voice memos"),
             UiText.text(this, "이전 사진에 이어 질문", "前の写真に続けて質問", "Follow up on photo"),
             UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"),
-            UiText.text(this, "도보 길찾기", "徒歩ナビ", "Walking navigation"))
+            UiText.text(this, "길찾기", "ルート検索", "Directions"))
         quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 질문", "クイック質問", "Quick questions"))
             .setItems(labels) { _, which ->
                 when (which) {
