@@ -29,6 +29,8 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 
 ## Latest on main
 
+Wi-Fi/mobile signal indicators now share the battery status row, and activity banners no longer clip their text.
+
 Reactive avatar controls, a camera treasure hunt, Korean/Japanese/English conversation practice, and a configurable charging-clock idle delay (10 seconds to 5 minutes; default 20 seconds). See the language guides for use and validation limits. These source additions do not replace the existing V1.5 release tag or its demo screenshots.
 
 ## New in V1.5

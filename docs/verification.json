@@ -52,5 +52,16 @@
     },
     "live_photo_judgment_and_practice_response": "not tested",
     "v1_5_release_tag_and_screenshots": "unchanged"
+  },
+  "network_and_banner_update": {
+    "builds": "debug and offline demo passed",
+    "jvm_tests": 94,
+    "lint_errors": {
+      "MissingPermission": 13,
+      "SuspiciousIndentation": 2
+    },
+    "device_evidence": "Private development build: LTE signal 4/4 with validated internet; unclipped hunt banner visually checked",
+    "wifi_switching": "not tested live",
+    "demo": "fixed fictional Wi-Fi signal; added Wi-Fi/basic-phone permissions removed"
   }
 }

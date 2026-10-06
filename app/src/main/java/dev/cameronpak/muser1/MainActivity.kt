@@ -122,6 +122,7 @@ class MainActivity : Activity() {
     }
     private fun practicePayload(text:String)=FunPrompts.practice(funModes.language,funModes.scenarios[funModes.scene],text)
     private var batteryRegistered = false
+    private lateinit var networkStatus: NetworkStatusView
     private lateinit var batteryStatus: TextView
     private fun refreshBatteryStatus() {
         if (!::batteryStatus.isInitialized) return
@@ -280,14 +281,28 @@ class MainActivity : Activity() {
             setPadding(dp(16), 0, dp(16), 0); includeFontPadding = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
-        root.addView(batteryStatus, LinearLayout.LayoutParams(-1, dp(20)))
+        val deviceStatusRow=LinearLayout(this).apply { gravity=android.view.Gravity.CENTER_VERTICAL;setPadding(dp(16),0,0,0) }
+        networkStatus=NetworkStatusView(this)
+        deviceStatusRow.addView(networkStatus,LinearLayout.LayoutParams(dp(120),-1))
+        deviceStatusRow.addView(batteryStatus,LinearLayout.LayoutParams(0,-1,1f))
+        root.addView(deviceStatusRow, LinearLayout.LayoutParams(-1, dp(20)))
         refreshBatteryStatus()
         root.addView(modeRow, LinearLayout.LayoutParams(-1, dp(48)))
         root.addView(languageRow, LinearLayout.LayoutParams(-1, dp(48)))
-        funStatus=button { if(funModes.mode=="practice")showPracticeControls() else showHunt() }.apply { textSize=11f }
+        funStatus=button { if(funModes.mode=="practice")showPracticeControls() else showHunt() }.apply {
+            textSize=12f; gravity=android.view.Gravity.CENTER
+            includeFontPadding=false; maxLines=2
+            minHeight=dp(40);minimumHeight=dp(40)
+            setPadding(dp(12),dp(6),dp(12),dp(6))
+            setTextColor(android.graphics.Color.rgb(242,233,221))
+            background=android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius=dp(12).toFloat()
+                setColor(android.graphics.Color.rgb(23,24,23))
+                setStroke(dp(1),android.graphics.Color.rgb(55,56,54))
+            }
+        }
         funStatus.setOnClickListener { if(!recording) { stopContinuous(false); if(funModes.mode=="practice")showPracticeControls() else showHunt() } }
-        paintButton(funStatus,false)
-        root.addView(funStatus,LinearLayout.LayoutParams(-1,dp(32)).apply { leftMargin=dp(16);rightMargin=dp(16) })
+        root.addView(funStatus,LinearLayout.LayoutParams(-1,-2).apply { leftMargin=dp(16);rightMargin=dp(16);topMargin=dp(2);bottomMargin=dp(2) })
         refreshFunStatus()
         root.addView(screen, LinearLayout.LayoutParams(-1, 0, 1f))
         clockStatus = Button(this).apply {
@@ -766,7 +781,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         foreground = this
-        if (BuildConfig.DEMO) { showOfflineDemo(); return }
+        if (BuildConfig.DEMO) { networkStatus.showDemo(); showOfflineDemo(); return }
+        networkStatus.start()
         lastInteraction=android.os.SystemClock.elapsedRealtime()
         if(!batteryRegistered){registerReceiver(batteryReceiver,android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));batteryRegistered=true}
         if (keepScreenAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1214,6 +1230,7 @@ class MainActivity : Activity() {
         releaseScreenAwake(); connection?.close(); connection = null
     }
     override fun onPause() {
+        networkStatus.stop()
         closeDeskClock()
         if(batteryRegistered){unregisterReceiver(batteryReceiver);batteryRegistered=false}
         quickButton.removeCallbacks(playbackControls)

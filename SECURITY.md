@@ -39,3 +39,5 @@ Weather is a separate HTTPS request to Open-Meteo using coordinates rounded to t
 天気は丸めた座標でOpen-Meteoに問い合わせ、地域名はAndroidのジオコーダーを利用します。位置履歴は保存せず、リマインダーは端末内に保存します。
 
 Activity modes store the selected mode, practice language/scenario and hunt target locally. Practice text goes to Muse; configured ElevenLabs transcribes voice practice. Hunt photos are sent only after the existing photo-review confirmation. No scores or audio archive are added. The clock idle delay is a local preference.
+
+The foreground network indicator uses ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE and READ_BASIC_PHONE_STATE (on supported Android versions) to display connection and signal information. It does not log or persist network names, phone numbers or SIM identifiers, and makes no external request. The offline demo strips the two added permissions and uses a fixed fictional signal.
