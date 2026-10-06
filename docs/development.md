@@ -46,6 +46,17 @@ The gallery is captured at the existing r1 480×640 / density 200 configuration.
 
 The generalized ElevenLabs provisioning tool is syntax/mock checked; this publication task did not submit an API key or generate audio. Actual model/voice availability must be checked using the reader's account.
 
-## Walking navigation checks (October 6, 2026)
+## Embedded walking map checks (October 6, 2026)
 
-Normal APK build and **70 JVM tests passed**. New tests cover multilingual URI encoding/parameter injection, destination validation and fix freshness/accuracy. The private feature APK was updated on the owner's r1 with credential/history/library hashes unchanged. Foreground location permission and a live fix with reported accuracy around 16 m were verified; Google Maps was installed. A real destination route and outdoor turn-by-turn guidance have not yet been verified. No actual coordinates are published. Lint retains 15 existing errors; the two additional warnings concern the new activity's fixed orientation. The public normal APK is still not installed over the private avatar build.
+Normal and demo APK builds pass; **73 JVM tests pass**. New tests cover the pedestrian endpoint, coordinate validation, response parsing, stale/inaccurate fixes, next-direction progress, off-route detection and duplicate geometry. Lint remains **15 errors / 38 warnings**, with no new navigation-code errors. The normal public export APK is not installed over the private avatar build.
+
+The private feature APK is installed on the owner's r1. A dedicated opt-in device check launches only NavigationActivity, supplies a synthetic public-landmark origin, obtains a live pedestrian route and checks actual WebView tile/route/position rendering plus Android geocoding. It never opens a microphone or sends a Muse turn. The capture is labeled DEMO and uses Tokyo Station and Tokyo International Forum, not the owner's actual location. This is an online public-landmark test, distinct from the offline conversation demo. Actual outdoor motion and road-by-road guidance remain unverified.
+
+After building `:app:assembleDebugAndroidTest`, this explicit hardware check is available to a device owner who authorizes it:
+
+```sh
+adb shell am instrument -w -r -e embeddedMap true \
+  dev.cameronpak.muser1.test/dev.cameronpak.muser1.DeviceChecks
+```
+
+Require both a `PASS` stream and `INSTRUMENTATION_CODE: -1`. Do not run the runner without `embeddedMap true`; its other modes have different device/audio requirements. The fixture uses live public map/routing/geocoding services and must not be run in bulk or unattended loops. A single labeled capture is written to app cache; no credentials or user conversations are included.

@@ -17,3 +17,7 @@ Screenshots show real native app views with fictional offline fixtures and the r
 한국어: 원본 Muse r1의 기본 아바타를 픽셀 변경 없이 복원했습니다. 원본 문서에서 이 이미지는 MIT 코드 라이선스 대상이 아니며 재배포 권리가 확정되지 않았다고 명시합니다. 이 저장소가 이미지에 새로운 이용 허락을 부여하는 것은 아닙니다. 개인 돌고래 이미지는 포함하지 않습니다.
 
 日本語: 元のMuse r1の標準アバターを画像変更なしで復元しました。上流資料では、この画像はMITコードライセンスの対象外で再配布権は未確定とされています。このリポジトリは画像に新たな利用許諾を付与しません。個人のイルカ画像は含めません。
+
+## Embedded map
+
+Leaflet 1.9.4 (`app/src/main/assets/map/leaflet.js` and `leaflet.css`) is vendored from the official npm release, under BSD-2-Clause; see adjacent `Leaflet-LICENSE.txt`. Map data © OpenStreetMap contributors (ODbL); tiles follow the [OSMF tile policy](https://operations.osmfoundation.org/policies/tiles/). Pedestrian routing is provided by [FOSSGIS/OSRM](https://routing.openstreetmap.de/about.html), under its service usage policy. Attribution remains visible in the map. Android Geocoder supplies destination search. These services are independent of Muse AI.

@@ -44,3 +44,9 @@ Cameron Pakさんのmuse-r1をベースに、LineageOSを導入したRabbit r1�
 https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1
 
 画像は架空データを使ったオフラインデモであり、実際のAI回答の検証画面ではありません。コミュニティの試作版で、一部の機能は追加の実利用検証が必要です。原作者Cameron Pakさんとr1コミュニティに感謝します。フィードバック歓迎です！
+
+## Embedded walking map
+
+![Muse embedded walking map](images/ko-walking-map.png)
+
+Online map test on Rabbit r1. The origin and destination are public-landmark fixtures (Tokyo Station → Tokyo International Forum), not the owner's live location. No Muse account data appears. Unlike the offline conversation screenshots, this capture exercises live map tiles and pedestrian routing.

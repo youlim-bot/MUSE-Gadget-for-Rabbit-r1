@@ -2,7 +2,7 @@
   "date": "2026-10-06",
   "normal_apk_build": "passed",
   "offline_demo_apk_build": "passed",
-  "jvm_tests": 70,
+  "jvm_tests": 73,
   "jvm_failures": 0,
   "lint": {
     "status": "failed",
@@ -32,12 +32,14 @@
     "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
   },
   "walking_navigation": {
+    "implementation": "embedded Leaflet map + Android Geocoder + FOSSGIS pedestrian OSRM",
     "private_apk_installed": true,
-    "foreground_location_fix_verified": true,
-    "reported_accuracy_m_approx": 16,
-    "google_maps_installed": true,
-    "real_route_verified": false,
+    "public_landmark_live_route_verified": true,
+    "native_geocoder_verified": true,
+    "embedded_tiles_and_route_verified": true,
     "outdoor_turn_by_turn_verified": false,
-    "coordinates_published": false
+    "voice_guidance": false,
+    "background_tracking": false,
+    "coordinates_published": "synthetic public landmarks only"
   }
 }

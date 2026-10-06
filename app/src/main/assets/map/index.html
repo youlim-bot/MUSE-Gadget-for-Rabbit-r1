@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src https://tile.openstreetmap.org data:; connect-src 'none'; frame-src 'none'; base-uri 'none'">
+<link rel="stylesheet" href="leaflet.css"><style>
+html,body,#map{height:100%;margin:0;background:#151716;font-family:sans-serif}.leaflet-container{background:#252925}.leaflet-control-attribution{font-size:9px!important;color:#333}.leaflet-control-attribution a{color:#4b493d}.leaflet-bar{border:0!important}.leaflet-bar a{background:#181b19;color:#fff;border-color:#454741}.leaflet-control-zoom a{width:34px;height:34px;line-height:34px}#note{position:absolute;z-index:1000;top:12px;left:45px;right:45px;text-align:center;color:#ddd;background:#151716de;border-radius:10px;padding:9px;font-size:12px;pointer-events:none}
+</style></head><body><div id="map"></div><div id="note"></div><script src="leaflet.js"></script><script>
+'use strict';
+const map=L.map('map',{zoomControl:false,attributionControl:true});
+L.control.zoom({position:'bottomright'}).addTo(map);
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://www.openstreetmap.org/fixthemap">Fix map</a> · <a href="https://routing.openstreetmap.de/about.html">FOSSGIS</a>');
+let tiles=null, dot=null, ring=null, route=null, target=null, following=true, ready=false;
+window.mapState={tiles:0,errors:0,routePoints:0,hasPosition:false};
+window.mapReady=()=>Boolean(tiles&&!tiles.isLoading()&&window.mapState.tiles>0&&window.mapState.errors===0);
+function position(lat,lon,accuracy){
+ const ll=[lat,lon];if(!tiles){tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:0,updateWhenIdle:true}).addTo(map);tiles.on('tileload',()=>{window.mapState.tiles++;document.getElementById('note').style.display='none'});tiles.on('tileerror',()=>{window.mapState.errors++;if(!window.mapState.tiles)notice(window.tileError||'Map unavailable')});}
+ if(!dot){ring=L.circle(ll,{radius:accuracy,color:'#4285f4',weight:1,fillOpacity:.1}).addTo(map);dot=L.circleMarker(ll,{radius:8,color:'white',weight:3,fillColor:'#4285f4',fillOpacity:1}).addTo(map);}else{dot.setLatLng(ll);ring.setLatLng(ll).setRadius(accuracy)}
+ if(!ready||following)map.setView(ll,ready?map.getZoom():16,{animate:false});ready=true;window.mapState.hasPosition=true;
+}
+function notice(text){const n=document.getElementById('note');n.textContent=text;n.style.display=text?'block':'none'}
+function drawRoute(points,end){if(route)map.removeLayer(route);if(target)map.removeLayer(target);route=L.polyline(points,{color:'#ff981f',weight:6,opacity:.95}).addTo(map);target=L.circleMarker(end,{radius:8,color:'#181b19',weight:3,fillColor:'#ff981f',fillOpacity:1}).addTo(map);following=false;map.fitBounds(route.getBounds(),{padding:[28,28],maxZoom:17});window.mapState.routePoints=points.length;notice('');}
+function clearRoute(){if(route)map.removeLayer(route);if(target)map.removeLayer(target);route=null;target=null;window.mapState.routePoints=0;}
+function center(){following=true;if(dot)map.setView(dot.getLatLng(),17)}
+map.on('dragstart',()=>following=false);
+map.on('contextmenu',e=>{if(window.MuseMap)MuseMap.choose(e.latlng.lat,e.latlng.lng)});
+</script></body></html>

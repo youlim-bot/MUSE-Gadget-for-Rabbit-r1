@@ -13,7 +13,6 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
     <queries>
-        <package android:name="com.google.android.apps.maps" />
         <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
     </queries>
     <application
