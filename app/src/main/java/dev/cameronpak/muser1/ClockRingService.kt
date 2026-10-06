@@ -20,7 +20,7 @@ class ClockRingService:Service(){
         nm.createNotificationChannel(channel)
         val stop=PendingIntent.getService(this,1,Intent(this,ClockDismissService::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n=Notification.Builder(this,"local-clock-ring").setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(UiText.text(this,"R1 알람·타이머","R1 アラーム・タイマー","R1 alarm / timer"))
+            .setContentTitle(ringing.firstOrNull{it.title.isNotBlank()}?.title ?: UiText.text(this,"R1 알람·타이머","R1 アラーム・タイマー","R1 alarm / timer"))
             .setContentText(UiText.text(this,"눌러서 중지 또는 5분 뒤 다시","タップして停止・5分後に再通知","Tap to stop or snooze 5 min"))
             .setCategory(Notification.CATEGORY_ALARM).setOngoing(true).setContentIntent(LocalClock.open(this)).setFullScreenIntent(LocalClock.open(this),true)
             .addAction(Notification.Action.Builder(null,UiText.text(this,"끄기","停止","Stop"),stop).build()).build()

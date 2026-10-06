@@ -9,14 +9,14 @@ import org.json.*
 import java.time.*
 import java.util.UUID
 
-internal data class ClockEntry(val id:String=UUID.randomUUID().toString(),val kind:String,val due:Long,val elapsed:Long=0,val boot:Int=0,val remaining:Long=0,val state:String="active",val weekdays:Boolean=false,val hour:Int=0,val minute:Int=0)
+internal data class ClockEntry(val id:String=UUID.randomUUID().toString(),val kind:String,val due:Long,val elapsed:Long=0,val boot:Int=0,val remaining:Long=0,val state:String="active",val weekdays:Boolean=false,val hour:Int=0,val minute:Int=0,val title:String="")
 internal object LocalClock {
     private fun prefs(c:Context)=c.getSharedPreferences("local_clock",Context.MODE_PRIVATE)
     @Synchronized fun entries(c:Context):List<ClockEntry> {
         val a=JSONArray(prefs(c).getString("entries","[]"))
-        return (0 until a.length()).map{val o=a.getJSONObject(it);ClockEntry(o.getString("id"),o.getString("kind"),o.getLong("due"),o.optLong("elapsed"),o.optInt("boot"),o.optLong("remaining"),o.optString("state","active"),o.optBoolean("weekdays"),o.optInt("hour"),o.optInt("minute"))}
+        return (0 until a.length()).map{val o=a.getJSONObject(it);ClockEntry(o.getString("id"),o.getString("kind"),o.getLong("due"),o.optLong("elapsed"),o.optInt("boot"),o.optLong("remaining"),o.optString("state","active"),o.optBoolean("weekdays"),o.optInt("hour"),o.optInt("minute"),o.optString("title"))}
     }
-    private fun save(c:Context,list:List<ClockEntry>){val a=JSONArray();list.forEach{a.put(JSONObject().put("id",it.id).put("kind",it.kind).put("due",it.due).put("elapsed",it.elapsed).put("boot",it.boot).put("remaining",it.remaining).put("state",it.state).put("weekdays",it.weekdays).put("hour",it.hour).put("minute",it.minute))};check(prefs(c).edit().putString("entries",a.toString()).commit())}
+    private fun save(c:Context,list:List<ClockEntry>){val a=JSONArray();list.forEach{a.put(JSONObject().put("id",it.id).put("kind",it.kind).put("due",it.due).put("elapsed",it.elapsed).put("boot",it.boot).put("remaining",it.remaining).put("state",it.state).put("weekdays",it.weekdays).put("hour",it.hour).put("minute",it.minute).put("title",it.title))};check(prefs(c).edit().putString("entries",a.toString()).commit())}
     fun exact(c:Context)=Build.VERSION.SDK_INT<31||c.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
     fun boot(c:Context)=Settings.Global.getInt(c.contentResolver,Settings.Global.BOOT_COUNT,0)
     fun remaining(c:Context,e:ClockEntry):Long=if(e.state=="paused")e.remaining else if(e.kind=="timer"&&e.boot==boot(c))e.elapsed-SystemClock.elapsedRealtime()else e.due-System.currentTimeMillis()
@@ -29,7 +29,7 @@ internal object LocalClock {
     }
     @Synchronized fun add(c:Context,command:ClockCommand):ClockEntry {
         check(exact(c));require(command.kind in setOf("timer","alarm"));if(command.kind=="timer")require(command.seconds in 1..86400);val all=entries(c);require(all.size<40)
-        val now=System.currentTimeMillis();val e=if(command.kind=="timer")ClockEntry(kind="timer",due=now+command.seconds*1000,elapsed=SystemClock.elapsedRealtime()+command.seconds*1000,boot=boot(c))else ClockEntry(kind="alarm",due=LocalClockCommand.due(command,ZonedDateTime.now()),weekdays=command.weekdays,hour=command.hour,minute=command.minute)
+        val now=System.currentTimeMillis();val e=if(command.kind=="timer")ClockEntry(kind="timer",due=now+command.seconds*1000,elapsed=SystemClock.elapsedRealtime()+command.seconds*1000,boot=boot(c))else ClockEntry(kind="alarm",due=LocalClockCommand.due(command,ZonedDateTime.now()),weekdays=command.weekdays,hour=command.hour,minute=command.minute,title=command.title.take(160))
         save(c,all+e);try{schedule(c,e)}catch(t:Exception){save(c,all);throw t};return e
     }
     @Synchronized fun change(c:Context,id:String,action:String){

@@ -2,7 +2,7 @@ package dev.cameronpak.muser1
 
 import java.time.*
 
-internal data class ClockCommand(val kind:String,val seconds:Long=0,val hour:Int=0,val minute:Int=0,val day:String="next",val weekdays:Boolean=false)
+internal data class ClockCommand(val kind:String,val seconds:Long=0,val hour:Int=0,val minute:Int=0,val day:String="next",val weekdays:Boolean=false,val title:String="",val at:Long=0)
 internal object LocalClockCommand {
     fun parse(input:String,interpreting:Boolean=false):ClockCommand? {
         if(interpreting)return null
@@ -35,6 +35,7 @@ internal object LocalClockCommand {
     }
     fun due(c:ClockCommand,now:ZonedDateTime):Long {
         require(c.kind=="alarm")
+        if(c.at>0){require(c.at>now.toInstant().toEpochMilli()){"Past time"};return c.at}
         var t=now.withHour(c.hour).withMinute(c.minute).withSecond(0).withNano(0)
         if(c.day=="tomorrow")t=t.plusDays(1)
         else if(!t.isAfter(now)){require(c.day!="today"){"Past time"};t=t.plusDays(1)}

@@ -19,7 +19,7 @@ With ElevenLabs configured: microphone → Scribe → text → Muse → reply te
 
 Continuous interpretation is sequential: listen, stop/endpoint, transcribe, translate, speak, listen again. Camera questions explicitly attach an optimized JPEG (maximum 1024px dimension, 180KB payload budget). The last photo exists only in process memory and is resent for each follow-up; it is not a persistent gallery reference.
 
-Library favorites are independent snapshots. Task extraction sends a memo to Muse via a short-lived connection, accepts at most 50 bounded strings, asks the user to review/edit, then saves a separate checklist. Original text survives parsing/network failures. No automatic deadline inference, reminders or calendar access is implemented.
+Library favorites are independent snapshots. Task extraction sends a memo to Muse via a short-lived connection, accepts at most 50 bounded strings, asks the user to review/edit, then saves a separate checklist. Original text survives parsing/network failures. Checklist extraction does not infer deadlines or access external calendars. Separate local appointment reminders are available in V1.5.
 
 The demo build strips Internet/microphone/camera permissions and the accessibility service, skips account import/connection, and seeds only hard-coded fictional data. Its native UI uses the same view classes. Fixture content must not be confused with a live result.
 
@@ -30,3 +30,7 @@ Read [privacy](../SECURITY.md), [build/verification](development.md), and the la
 LocalClockCommand parses supported phrases before Muse text transport. ClockPanel is shared between a dialog over the conversation and the Muse-owned lock-screen ClockActivity. LocalClock stores schedules separately in app-private preferences and uses AlarmManager alarm-clock pending intents. ClockReceiver restores schedules on supported lifecycle broadcasts. ClockRingService plays alarm audio as a foreground service with a bounded wake lock. No clock data is sent over the network after scheduling.
 
 MainActivity exposes the stop-voice control while SpeechOutput has queued/active playback, clears it via the existing stop path, and suppresses further speech for that conversation turn. It does not change the persisted quiet preference. Offline demos omit clock permissions/components and cannot schedule real alarms.
+
+## V1.5 components
+
+`ReminderCommand` parses supported reminder phrases and opens `ClockPanel` for confirmation. `ClockHomeStatus` supplies the home summary. `DeskClockDialog` owns the charging display and cancels its location/weather coroutine on dismissal. `ClockWeather` requests current temperature, humidity and weather code plus hourly UV index from [Open-Meteo](https://open-meteo.com/en/docs). UV selection matches the current Unix timestamp to its hourly interval; missing values remain unknown. `SpeechTiming` maps supported speech alignment to transcript offsets; manual scrolling suspends following.

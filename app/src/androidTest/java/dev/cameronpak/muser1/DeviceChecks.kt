@@ -35,6 +35,11 @@ import kotlin.math.sin
 
 /** Local hardware checks. No Muse network calls or account credentials are fabricated. */
 class DeviceChecks : Instrumentation() {
+    private var reminderUi = false
+    private var additions = false
+    private var screenTimeout = false
+    private var readingCheck = false
+    private var clockHome = false
     private var stopVoice = false
     private var localClock = false
     private var cloud = false
@@ -50,6 +55,11 @@ class DeviceChecks : Instrumentation() {
     private var expectedTranscript = "Please say the words Muse on Rabbit is working and nothing else."
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        reminderUi = arguments?.getString("reminderUi") == "true"
+        additions = arguments?.getString("additions") == "true"
+        screenTimeout = arguments?.getString("screenTimeout") == "true"
+        readingCheck = arguments?.getString("readingCheck") == "true"
+        clockHome = arguments?.getString("clockHome") == "true"
         stopVoice = arguments?.getString("stopVoice") == "true"
         localClock = arguments?.getString("localClock") == "true"
         cloud = arguments?.getString("cloud") == "true"
@@ -68,6 +78,10 @@ class DeviceChecks : Instrumentation() {
     override fun onStart() {
         val result = Bundle()
         try {
+            if (additions || reminderUi) { AdditionsCheck.run(this,result,reminderUi);finish(Activity.RESULT_OK,result);return }
+            if (screenTimeout) { ScreenTimeoutCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
+            if (readingCheck) { ReadingCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
+            if (clockHome) { ClockHomeCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if (stopVoice) { StopVoiceCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if (localClock) { LocalClockCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if (volumeCheck) { volumeGestureCheck(result); finish(Activity.RESULT_OK, result); return }
@@ -115,7 +129,7 @@ class DeviceChecks : Instrumentation() {
             result.putString("stream", "PASS: side-button service hold starts recording; nonzero 16kHz PCM captured; WAV lengths match; audio playback completed. No audio sent to Muse.")
             finish(Activity.RESULT_OK, result)
         } catch (error: Exception) {
-            val detail = if (visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
+            val detail = if (reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
             result.putString("stream", result.getString("stream", "") + "FAIL: " + error.javaClass.simpleName + detail)
             finish(Activity.RESULT_CANCELED, result)
         }
@@ -367,7 +381,7 @@ class DeviceChecks : Instrumentation() {
                 if (!speaking) { onMain { speaking = screen.status.text == "MUSE IS SPEAKING" }; Thread.sleep(50) }
             }
             check(speaking) { "local TTS did not begin" }
-            onMain { press = SystemClock.uptimeMillis(); sideButtonKey(KeyEvent.ACTION_DOWN, press) }
+            onMain { press = SystemClock.uptimeMillis(); sideButtonKey(KeyEvent.ACTION_DOWN, press); check(wheel(true)) }
             Thread.sleep(450)
             onMain {
                 check(screen.status.text == "MUSE IS SPEAKING" && screen.message.text.contains(displayedReply)) { "playback hold interrupted or replaced the reply" }
@@ -455,7 +469,7 @@ class DeviceChecks : Instrumentation() {
                 speech.stop() // End before the hold timer, without any wheel movement.
             }
             Thread.sleep(450)
-            onMain { check(screen.status.text != "LISTENING"); sideButtonKey(KeyEvent.ACTION_UP, press) }
+            onMain { check(screen.status.text == "LISTENING"); check(wheel(false)); sideButtonKey(KeyEvent.ACTION_UP, press) }
             // Touching the character still interrupts actual playback and begins voice-note input.
             onMain { speech.speak(reply) }
             Thread.sleep(200)

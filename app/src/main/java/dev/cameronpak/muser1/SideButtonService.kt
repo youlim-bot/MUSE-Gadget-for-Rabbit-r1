@@ -67,6 +67,8 @@ class SideButtonService : AccessibilityService() {
                 if (event.action == KeyEvent.ACTION_UP) volumeKeys.remove(event.keyCode)
                 return true
             }
+            val home = MainActivity.foreground
+            if (power.isInteractive && !locked && home?.conversationWheel(event) == true) return true
             return false
         }
         if (event.keyCode != KeyEvent.KEYCODE_PAIRING) return false
@@ -100,6 +102,7 @@ class SideButtonService : AccessibilityService() {
 
     private fun handle(action: SideButtonGesture.Action) {
         when (action) {
+            SideButtonGesture.Action.INTERRUPT -> MainActivity.foreground?.stopReplySpeech()
             SideButtonGesture.Action.LOCK -> {
                 MainActivity.foreground?.prepareForLock()
                 if (!performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN))

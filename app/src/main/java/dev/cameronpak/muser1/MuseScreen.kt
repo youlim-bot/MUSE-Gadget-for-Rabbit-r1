@@ -37,7 +37,49 @@ internal class MuseScreen(
     private val latestFade = Paint()
     private var compact = 0f
     private var conversation = false
+    private var readingText: String? = null
+    private var readingOffset = 0
+    private var readingPaused = false
     private var followingLatest = true
+
+    internal fun scrollConversation(direction: Int, move: Boolean): Boolean {
+        if (!conversation || !scroll.isShown) return false
+        if (move) {
+            scroll.requestFocus()
+            readingPaused = true
+            followingLatest = false
+            applyingScroll = true
+            scroll.scrollTo(0, (scroll.scrollY + direction * dp(48)).coerceIn(0,
+                (message.height + scroll.paddingBottom - scroll.height).coerceAtLeast(0)))
+            applyingScroll = false
+            updateLatestButton()
+        }
+        return true // Consume both edges even at the first/last line; never focus a menu.
+    }
+
+    internal fun followSpeech(text: String, offset: Int) {
+        if (readingText != text) { readingText = text; readingPaused = false }
+        readingOffset = offset
+        followingLatest = false
+        if (!readingPaused) scroll.post { scrollToSpeech() }
+    }
+
+    internal fun endSpeechFollow() { readingText = null; readingPaused = false; updateLatestButton() }
+
+    private fun scrollToSpeech() {
+        val spoken = readingText ?: return
+        if (readingPaused || !conversation) return
+        val start = message.text.toString().lastIndexOf(spoken)
+        if (start < 0) return
+        val layout = message.layout ?: return
+        val line = layout.getLineForOffset((start + readingOffset).coerceIn(0, message.length()))
+        val top = layout.getLineTop(line)
+        applyingScroll = true
+        scroll.scrollTo(0, (top - dp(36)).coerceIn(0,
+            (message.height + scroll.paddingBottom - scroll.height).coerceAtLeast(0)))
+        applyingScroll = false
+        updateLatestButton()
+    }
     private var updatingTranscript = false
     private var applyingScroll = false
     private var transition: ValueAnimator? = null
@@ -67,6 +109,8 @@ internal class MuseScreen(
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
     }
     private val scroll: ScrollView = ScrollView(context).apply {
+        isFocusableInTouchMode = true
+        descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
         isFillViewport = false
         isVerticalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -81,7 +125,7 @@ internal class MuseScreen(
         }
         setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_MOVE)
-                followingLatest = false
+                { followingLatest = false; readingPaused = true }
             if (event.actionMasked == MotionEvent.ACTION_UP && atBottom()) followingLatest = true
             false
         }
@@ -195,10 +239,11 @@ internal class MuseScreen(
     private fun atBottom() = scroll.scrollY >= (message.height + scroll.paddingBottom - scroll.height).coerceAtLeast(0) - dp(2)
 
     private fun updateLatestButton() {
-        latest.visibility = if (conversation && scroll.isShown && !atBottom()) View.VISIBLE else View.GONE
+        latest.visibility = if (conversation && scroll.isShown && (!atBottom() || (readingText != null && readingPaused))) View.VISIBLE else View.GONE
     }
 
     fun jumpToLatest() {
+        if (readingText != null) { readingPaused = false; scrollToSpeech(); return }
         followingLatest = true
         scroll.post {
             if (followingLatest) {
@@ -210,10 +255,26 @@ internal class MuseScreen(
         }
     }
 
+    // Keep stored replies intact; render emphasis without exposing its Markdown delimiters.
+    // An unfinished bold segment is also supported while the reply is streaming.
+    internal fun formatMuseAnswer(value: String): CharSequence {
+        val result = SpannableStringBuilder()
+        var bold = false
+        value.split("**").forEachIndexed { index, part ->
+            if (index > 0) bold = !bold
+            val start = result.length
+            result.append(part)
+            if (bold && result.length > start) result.setSpan(
+                android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                start, result.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return result
+    }
+
     private fun showTranscript(history: List<ConversationTurn>, indicator: Phase?) {
         voiceIndicator = indicator?.let { VoiceIndicator(it) }
         val transcript = SpannableStringBuilder()
-        fun section(name: String, body: String, color: Int) {
+        fun section(name: String, body: CharSequence, color: Int) {
             if (transcript.isNotEmpty()) transcript.append("\n\n")
             val start = transcript.length
             transcript.append(name)
@@ -225,7 +286,7 @@ internal class MuseScreen(
             val active = index == history.lastIndex && indicator != null
             section(UiText.translate(context, if (turn.translationTarget != null) "원문" else "You"), turn.user?.takeIf { it.isNotBlank() } ?: if (active) "\uFFFC" else UiText.translate(context, "Transcript unavailable"), muted)
             if (active) voiceIndicator?.let { transcript.setSpan(it, transcript.length - 1, transcript.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-            if (!(active && indicator == Phase.LISTENING)) section(turn.translationTarget?.let { "${UiText.translate(context, "번역")} · ${UiText.translate(context, it)}" } ?: "Muse", turn.answer.ifBlank { "…" }, orange)
+            if (!(active && indicator == Phase.LISTENING)) section(turn.translationTarget?.let { "${UiText.translate(context, "번역")} · ${UiText.translate(context, it)}" } ?: "Muse", formatMuseAnswer(turn.answer.ifBlank { "…" }), orange)
         }
         message.contentDescription = if (indicator == null) null else transcript.toString().replace("\uFFFC",
             if (indicator == Phase.LISTENING) "Recording. Release to send." else "Transcribing voice note.")
@@ -235,7 +296,8 @@ internal class MuseScreen(
         showConversationArea()
         scroll.post {
             applyingScroll = true
-            if (followingLatest) scroll.scrollTo(0, (message.height + scroll.paddingBottom - scroll.height).coerceAtLeast(0))
+            if (readingText != null && !readingPaused) scrollToSpeech()
+            else if (followingLatest) scroll.scrollTo(0, (message.height + scroll.paddingBottom - scroll.height).coerceAtLeast(0))
             else scroll.scrollTo(0, position)
             applyingScroll = false
             updatingTranscript = false

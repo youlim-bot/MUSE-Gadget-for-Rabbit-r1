@@ -1,13 +1,14 @@
 {
+  "version": "V1.5",
   "date": "2026-10-06",
   "normal_apk_build": "passed",
   "offline_demo_apk_build": "passed",
-  "jvm_tests": 78,
+  "jvm_tests": 91,
   "jvm_failures": 0,
   "lint": {
     "status": "failed",
     "errors": 15,
-    "warnings": 38,
+    "warnings": 43,
     "error_categories": {
       "MissingPermission": 13,
       "SuspiciousIndentation": 2
@@ -18,30 +19,21 @@
     "resolution": "480x640",
     "density": 200,
     "package": "dev.cameronpak.muser1.demo",
-    "data": "fictional offline fixtures",
-    "internet_microphone_camera_permissions": false
+    "data": "fictional offline fixtures including location, weather, battery, reminders",
+    "internet_microphone_camera_location_permissions": false,
+    "individual_screens": 17,
+    "overview_sheets": 2
   },
   "normal_public_apk_installed_over_private_app": false,
   "live_muse_turns_or_elevenlabs_requests_during_publication": false,
-  "private_credentials_history_library_unchanged": true,
-  "provisioning_script": "syntax + offline success-path mock; no live account validation",
-  "avatar_refresh": {
-    "asset": "original upstream muse_character.png",
-    "matches_upstream_bytes": true,
-    "debug_and_demo_builds": "passed",
-    "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
-  },
-  "navigation": "removed at user request, including voice routing, Maps SDK and location permissions",
-  "local_clock": {
-    "private_device_checks": "passed: timer pause/resume/cancel, screen-lock firing, ringtone playback state, notification, snooze, next-minute alarm",
-    "inline_forms": "visually checked on r1",
-    "spoken_command_end_to_end": false,
-    "reboot_recovery_verified": false
-  },
-  "stop_voice": {
-    "local_tts_queue_and_button": "passed",
-    "elevenlabs_live_cancellation_tested": false,
-    "voice_default": "on",
-    "on_indicator": "orange"
-  }
+  "navigation": "not included; foreground location is used only for desk-clock weather",
+  "earlier_development_hardware_checks": [
+    "Side-button interruption and microphone capture without sending a Muse turn",
+    "Local reminder ringing and notification title",
+    "Charging clock automatic entry and tap-to-return",
+    "Weather icon, current humidity and hourly UV displayed on R1",
+    "Home battery state displayed on R1"
+  ],
+  "scope": "Publication checks build the public source and capture fixture UI. Earlier development checks used the private build; they do not constitute a new full public-build end-to-end test.",
+  "android_test_apk_build": "passed"
 }

@@ -1,5 +1,10 @@
 # Build and verification
 
+## Current publication: V1.5 (2026-10-06)
+
+Normal and offline-demo APK builds passed; 91 JVM tests passed with no failures. The separate demo APK was installed on Rabbit r1 for refreshed screenshots with fictional data. The normal public APK was not installed over the user's private app. Lint still reports 15 errors (13 MissingPermission, 2 SuspiciousIndentation) in pre-existing pairing/recorder/cipher sources; this is not a clean lint result. See [verification.json](verification.json). Earlier entries below are historical checks, not the V1.5 test count.
+
+
 Use Java 17 and Android SDK platform 36. Set `ANDROID_HOME` or create an ignored `local.properties`. The Gradle wrapper is included.
 
 ```sh
@@ -86,3 +91,7 @@ Private r1 installation preserved credentials, conversation history and saved-li
 The simplified inline alarm/timer forms were visually inspected on the 480×640 r1, including preset selection and visible top/bottom controls. Spoken-command end-to-end, human acoustic confirmation and reboot recovery remain unverified. 78 JVM tests pass. Public source builds and security checks are repeated for this publication. Historical verification counts above apply to their respective earlier builds.
 
 Publication lint: 15 existing errors / 38 warnings; no lint findings in the new Clock/LocalClock source files. General lint remains failing and is not represented as a passed check.
+
+### Recreate V1.5 sharing assets
+
+After building and installing the separate demo APK on an authorized r1, run `python3 scripts/capture-demo.py`. It checks demo ownership and the expected clock/reminder scenes before capturing. Then run `python3 scripts/make-showcase.py` in a Python environment with Pillow installed. It writes the overview sheets into `docs/images` and the Discord kit into the ignored `build` directory. Only use fictional demo content for public captures.

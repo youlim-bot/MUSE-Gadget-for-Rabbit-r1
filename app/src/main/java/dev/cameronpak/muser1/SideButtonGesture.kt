@@ -2,7 +2,7 @@ package dev.cameronpak.muser1
 
 /** One physical press owns its hold, release, and cancellation, even across unlock. */
 internal class SideButtonGesture {
-    enum class Action { NONE, LOCK, HOLD, FINISH, CANCEL }
+    enum class Action { NONE, LOCK, HOLD, FINISH, CANCEL, INTERRUPT }
 
     var downTime: Long? = null
         private set
@@ -25,7 +25,7 @@ internal class SideButtonGesture {
         val start = downTime ?: return Action.NONE
         if (holdHandled || now - start < HOLD_MS) return Action.NONE
         holdHandled = true
-        holdDelivered = holdAllowed && canHold && !playbackPress
+        holdDelivered = holdAllowed && canHold
         return if (holdDelivered) Action.HOLD else Action.NONE
     }
 
@@ -42,7 +42,7 @@ internal class SideButtonGesture {
         val action = when {
             canceled -> if (holdDelivered) Action.CANCEL else Action.NONE
             holdDelivered -> Action.FINISH
-            !holdHandled && now - start in 0 until HOLD_MS -> Action.LOCK
+            !holdHandled && now - start in 0 until HOLD_MS -> if (playbackPress) Action.INTERRUPT else Action.LOCK
             else -> Action.NONE // A hold whose timer was delayed must never become a lock tap.
         }
         cancel()

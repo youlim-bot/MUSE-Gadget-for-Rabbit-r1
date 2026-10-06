@@ -17,10 +17,16 @@ import kotlin.coroutines.resumeWithException
 internal class SpeechOutput(private val context: Context, private val onState: (String) -> Unit) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val store get() = (context.applicationContext as MuseApp).store
-    private val queue = ArrayDeque<String>()
+    var onReading: (String, Int) -> Unit = { _, _ -> }
+    var onReadingEnd: () -> Unit = {}
+    private data class Part(val text: String, val full: String, val offset: Int, val language: String)
+    private val queue = ArrayDeque<Part>()
     private var worker: Job? = null
     private var closed = false
-    private val local = AndroidSpeechOutput(context) { if (worker?.isActive != true) onState(it) }
+    private val local: AndroidSpeechOutput = AndroidSpeechOutput(context) {
+        if (worker?.isActive != true) { onState(it); if (!localPlayback()) onReadingEnd() }
+    }.also { output -> output.onReading = { text, offset -> onReading(text, offset) } }
+    private fun localPlayback(): Boolean = local.hasPlayback
     private val manager = context.getSystemService(AudioManager::class.java)
     private val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
@@ -32,10 +38,13 @@ internal class SpeechOutput(private val context: Context, private val onState: (
 
     fun speak(text: String, language: String = "ko") {
         if (closed || text.isBlank()) return
+        val clean = text.replace("**", "")
+        if (clean.isBlank()) return
         val config = store.elevenLabs()
-        if (config == null) { local.speak(text); return }
+        if (config == null) { local.speak(clean); return }
         local.stop()
-        queue.addAll(text.chunked(1800))
+        var offset = 0
+        clean.chunked(1800).forEach { part -> queue.add(Part(part, clean, offset, language)); offset += part.length }
         if (worker?.isActive == true) return
         worker = scope.launch(start = CoroutineStart.LAZY) {
             try {
@@ -45,12 +54,13 @@ internal class SpeechOutput(private val context: Context, private val onState: (
                 val api = ElevenLabsClient(config)
                 while (queue.isNotEmpty()) {
                     onState("ELEVEN V4 음성 생성 중")
-                    val audio = api.synthesize(queue.removeFirst(), language)
+                    val part = queue.removeFirst()
+                    val audio = api.synthesizeTimed(part.text, part.language)
                     ensureActive()
                     val file = File.createTempFile("eleven-playback-", ".mp3", context.cacheDir)
                     try {
-                        withContext(Dispatchers.IO) { file.writeBytes(audio) }
-                        play(file)
+                        withContext(Dispatchers.IO) { file.writeBytes(audio.audio) }
+                        play(file, audio, part)
                     } finally { file.delete() }
                 }
                 onState("READY")
@@ -58,11 +68,13 @@ internal class SpeechOutput(private val context: Context, private val onState: (
             catch (e: Exception) {
                 queue.clear()
                 onState(if (e is ElevenLabsFailure) "음성 생성 실패 (HTTP ${e.status})" else "음성 생성·재생 실패 — 연결을 확인하세요")
-            } finally { manager.abandonAudioFocusRequest(focus) }
+            } finally { onReadingEnd(); manager.abandonAudioFocusRequest(focus) }
         }.also { it.start() }
     }
 
-    private suspend fun play(file: File) {
+    private suspend fun play(file: File, audio: TimedSpeech, part: Part) {
+        val handler = Handler(Looper.getMainLooper())
+        var tick: Runnable? = null
         val player = MediaPlayer()
         try {
             player.setAudioAttributes(attributes)
@@ -70,7 +82,15 @@ internal class SpeechOutput(private val context: Context, private val onState: (
             suspendCancellableCoroutine<Unit> { cont ->
                 player.setOnPreparedListener {
                     if (cont.isActive) {
-                        try { it.playbackParams = android.media.PlaybackParams().setSpeed(ReadingSettings.speed(context)).setPitch(1f); it.start(); onState("MUSE IS SPEAKING") }
+                        try { it.playbackParams = android.media.PlaybackParams().setSpeed(ReadingSettings.speed(context)).setPitch(1f); it.start(); onState("MUSE IS SPEAKING")
+                            tick = object : Runnable {
+                                override fun run() {
+                                    if (!cont.isActive) return
+                                    val offset = audio.points.lastOrNull { point -> point.millis <= player.currentPosition }?.offset ?: 0
+                                    onReading(part.full, part.offset + offset)
+                                    handler.postDelayed(this, 100)
+                                }
+                            }.also { task -> handler.post(task) } }
                         catch (e: Exception) { cont.resumeWithException(e) }
                     }
                 }
@@ -81,11 +101,11 @@ internal class SpeechOutput(private val context: Context, private val onState: (
                 }
                 player.prepareAsync()
             }
-        } finally { player.release() }
+        } finally { tick?.let { handler.removeCallbacks(it) }; player.release() }
     }
 
     fun stop() {
-        queue.clear(); worker?.cancel(); worker = null; local.stop()
+        queue.clear(); worker?.cancel(); worker = null; local.stop(); onReadingEnd()
         manager.abandonAudioFocusRequest(focus)
     }
     fun close() { closed = true; stop(); scope.cancel(); local.close() }

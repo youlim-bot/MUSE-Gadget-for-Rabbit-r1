@@ -15,6 +15,8 @@ import java.util.UUID
 internal class AndroidSpeechOutput(private val context: Context, private val onState: (String) -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
     private val manager = context.getSystemService(AudioManager::class.java)
+    var onReading: (String, Int) -> Unit = { _, _ -> }
+    private val ranges = mutableMapOf<String, Pair<String, Int>>()
     private val pending = ArrayDeque<String>()
     private val active = mutableSetOf<String>()
     private var ready = false
@@ -36,8 +38,12 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
         engine.voices?.firstOrNull { it.locale.language == Locale.KOREAN.language && !it.isNetworkConnectionRequired }?.let { engine.voice = it }
         engine.setAudioAttributes(attributes)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) { handler.post { if (id in active) onState("MUSE IS SPEAKING") } }
+            override fun onStart(id: String?) { handler.post { if (id in active) { onState("MUSE IS SPEAKING"); ranges[id]?.let { onReading(it.first, it.second) } } } }
+            override fun onRangeStart(id: String?, start: Int, end: Int, frame: Int) {
+                handler.post { if (id in active) ranges[id]?.let { onReading(it.first, it.second + start) } }
+            }
             override fun onDone(id: String?) { handler.post {
+                ranges.remove(id)
                 if (active.remove(id) && active.isEmpty() && pending.isEmpty()) {
                     manager.abandonAudioFocusRequest(focus); onState("READY")
                 }
@@ -64,9 +70,13 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
         }
         engine.setSpeechRate(ReadingSettings.speed(context))
         while (pending.isNotEmpty()) {
-            for (part in pending.removeFirst().chunked(TextToSpeech.getMaxSpeechInputLength() - 1)) {
+            val full = pending.removeFirst()
+            var offset = 0
+            for (part in full.chunked(TextToSpeech.getMaxSpeechInputLength() - 1)) {
                 val id = UUID.randomUUID().toString()
                 active.add(id)
+                ranges[id] = full to offset
+                offset += part.length
                 if (engine.speak(part, TextToSpeech.QUEUE_ADD, null, id) == TextToSpeech.ERROR) {
                     stop(); onState("SPEECH FAILED"); return
                 }
@@ -80,7 +90,7 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
     }
 
     fun stop() {
-        pending.clear(); active.clear(); engine.stop()
+        pending.clear(); active.clear(); ranges.clear(); engine.stop()
         manager.abandonAudioFocusRequest(focus)
     }
 

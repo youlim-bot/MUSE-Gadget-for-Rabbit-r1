@@ -1,4 +1,6 @@
-# MUSE Gadget for Rabbit r1 — V1.0
+# MUSE Gadget for Rabbit r1 — V1.5
+
+[**V1.5 release**](https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1/releases/tag/v1.5) · [Discord image kit](https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1/releases/download/v1.5/MUSE-r1-V1.5-Discord-kit.zip)
 
 **[English guide](docs/en/GUIDE.md) · [한국어 가이드](docs/ko/GUIDE.md) · [日本語ガイド](docs/ja/GUIDE.md)**
 
@@ -24,6 +26,16 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 - [Source map and data flow](docs/architecture.md)
 - [Build, verification and demo capture](docs/development.md)
 - [Privacy and security](SECURITY.md) · [Credits and asset license](CREDITS.md)
+
+## New in V1.5
+
+Side-button speech interruption, local appointment reminders, home battery and clock status, speech-following conversation scroll, screen-awake control, and a charging desk clock with weekday, weather icons, humidity and hourly UV forecasts. [Release notes — EN / KO / JA](docs/RELEASE-V1.5.md).
+
+<p align="center">
+  <img src="docs/images/en-clock.png" width="230" alt="V1.5 charging clock with fictional weather">
+  <img src="docs/images/en-alarms.png" width="230" alt="V1.5 local reminder example">
+  <img src="docs/images/en-home.png" width="230" alt="V1.5 home battery and reminder status">
+</p>
 
 ## Features
 

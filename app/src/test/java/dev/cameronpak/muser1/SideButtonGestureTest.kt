@@ -16,14 +16,14 @@ class SideButtonGestureTest {
         assertEquals(FINISH, gesture.up(2000, 2600, false))
     }
 
-    @Test fun playbackAtPressKeepsTheMicrophoneClosedEvenAfterPlaybackEnds() {
+    @Test fun playbackHoldInterruptsToTalkAndTapStopsInsteadOfLocking() {
         val gesture = SideButtonGesture()
         gesture.down(1000, true, preservePlayback = true)
-        assertEquals(NONE, gesture.hold(1300, true))
+        assertEquals(HOLD, gesture.hold(1300, true))
         assertEquals(NONE, gesture.hold(1800, true))
-        assertEquals(NONE, gesture.up(1000, 1900, false))
+        assertEquals(FINISH, gesture.up(1000, 1900, false))
         gesture.down(2000, true, preservePlayback = true)
-        assertEquals(LOCK, gesture.up(2000, 2120, false)) // A tap still locks during playback.
+        assertEquals(INTERRUPT, gesture.up(2000, 2120, false))
     }
 
     @Test fun wheelDiscardsAnActiveHoldAndKeepsOwnershipUntilRelease() {

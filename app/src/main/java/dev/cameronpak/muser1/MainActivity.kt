@@ -58,6 +58,74 @@ class MainActivity : Activity() {
             quickButton.postDelayed(this,200)
         }
     }
+    private lateinit var clockStatus: Button
+    private val clockStatusTicker = object : Runnable {
+        override fun run() {
+            if (foreground !== this@MainActivity) return
+            refreshClockStatus()
+            updateDeskClock()
+            clockStatus.postDelayed(this, 1000)
+        }
+    }
+    private fun refreshClockStatus() {
+        val summary = ClockHomeStatus.text(this)
+        clockStatus.visibility = if (summary.isEmpty()) View.GONE else View.VISIBLE
+        if (clockStatus.text.toString() != summary) clockStatus.text = summary
+        clockStatus.contentDescription = summary + UiText.text(this, " · 알람·타이머 열기", " · アラーム・タイマーを開く", " · Open alarms and timers")
+    }
+    private var deskClock: DeskClockDialog? = null
+    private var charging = false
+    private var batteryPercent = 0
+    private var batteryRegistered = false
+    private lateinit var batteryStatus: TextView
+    private fun refreshBatteryStatus() {
+        if (!::batteryStatus.isInitialized) return
+        val state = if (charging) {
+            if (batteryPercent == 100) UiText.text(this,"충전 완료","充電完了","Fully charged")
+            else UiText.text(this,"충전 중","充電中","Charging")
+        } else UiText.text(this,"배터리","バッテリー","Battery")
+        batteryStatus.text = "$state · ${batteryPercent}%"
+        batteryStatus.contentDescription = UiText.text(this,"배터리","バッテリー","Battery") + " ${batteryPercent}% · $state"
+        batteryStatus.setTextColor(if (!charging && batteryPercent <= 20) android.graphics.Color.rgb(255,164,99) else android.graphics.Color.rgb(165,173,168))
+    }
+    private var lastInteraction = android.os.SystemClock.elapsedRealtime()
+    private val deskEnabled get() = getSharedPreferences("reading", MODE_PRIVATE).getBoolean("desk_clock", true)
+    private val batteryReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            charging = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) != 0
+            val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+            batteryPercent = (intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 0) * 100 / scale).coerceIn(0,100)
+            refreshBatteryStatus()
+            if (!charging) closeDeskClock()
+        }
+    }
+    private fun closeDeskClock() { deskClock?.dismiss(); deskClock = null; lastInteraction = android.os.SystemClock.elapsedRealtime() }
+    private fun openDeskClock() {
+        if (deskClock != null || !charging) return
+        deskClock = DeskClockDialog(this, { batteryPercent }) { deskClock = null; lastInteraction = android.os.SystemClock.elapsedRealtime() }.also { it.show() }
+    }
+    private fun updateDeskClock() {
+        if (deskEnabled && charging && deskClock == null && hasWindowFocus() &&
+            android.os.SystemClock.elapsedRealtime() - lastInteraction >= 20000 &&
+            !recording && !sending && !continuous && !speech.hasPlayback &&
+            clockDialog == null && controls?.isShowing != true && composer == null && quickDialog == null &&
+            clearDialog?.isShowing != true && languageDialog?.isShowing != true && displayLanguagePopup?.isShowing != true) openDeskClock()
+    }
+    private fun showDeskClockSettings() {
+        controls = AlertDialog.Builder(this).setTitle(UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"))
+            .setSingleChoiceItems(arrayOf(
+                UiText.text(this,"켜기 · 충전 중 20초 후 표시","オン · 充電中20秒後に表示","On · after 20 seconds idle while plugged in"),
+                UiText.text(this,"끄기","オフ","Off")), if(deskEnabled)0 else 1) { dialog, index ->
+                getSharedPreferences("reading",MODE_PRIVATE).edit().putBoolean("desk_clock",index==0).apply()
+                lastInteraction=android.os.SystemClock.elapsedRealtime();dialog.dismiss()
+            }.setPositiveButton(UiText.text(this,"지금 보기","今すぐ表示","Show now")){_,_->
+                if(charging)openDeskClock() else android.widget.Toast.makeText(this,UiText.text(this,"충전기를 연결해 주세요","充電器を接続してください","Connect a charger first"),android.widget.Toast.LENGTH_SHORT).show()
+            }.setNegativeButton(tr("닫기"),null).show()
+    }
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if(event.actionMasked==android.view.MotionEvent.ACTION_DOWN) lastInteraction=android.os.SystemClock.elapsedRealtime()
+        return super.dispatchTouchEvent(event)
+    }
     private var transcriptPending = false
     private val history = mutableListOf<ConversationTurn>()
     private var activeTurn: ConversationTurn? = null
@@ -145,9 +213,33 @@ class MainActivity : Activity() {
         languageRow.addView(inputButton, LinearLayout.LayoutParams(0, -1, 1f))
         languageRow.addView(swapButton, LinearLayout.LayoutParams(dp(48), -1))
         languageRow.addView(targetButton, LinearLayout.LayoutParams(0, -1, 1f))
+        batteryStatus = TextView(this).apply {
+            textSize = 11f; gravity = android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(16), 0, dp(16), 0); includeFontPadding = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
+        root.addView(batteryStatus, LinearLayout.LayoutParams(-1, dp(20)))
+        refreshBatteryStatus()
         root.addView(modeRow, LinearLayout.LayoutParams(-1, dp(48)))
         root.addView(languageRow, LinearLayout.LayoutParams(-1, dp(48)))
         root.addView(screen, LinearLayout.LayoutParams(-1, 0, 1f))
+        clockStatus = Button(this).apply {
+            textSize = 12f; isAllCaps = false; gravity = android.view.Gravity.CENTER
+            minWidth = 0; minimumWidth = 0; minHeight = dp(40); minimumHeight = dp(40)
+            setPadding(dp(8), dp(5), dp(8), dp(5))
+            elevation = 0f; stateListAnimator = null
+            setTextColor(android.graphics.Color.rgb(255, 164, 99))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(android.graphics.Color.rgb(29, 28, 25))
+                setStroke(dp(1), android.graphics.Color.rgb(65, 54, 43))
+            }
+            visibility = View.GONE
+            setOnClickListener { stopContinuous(false); showClockPanel() }
+        }
+        root.addView(clockStatus, LinearLayout.LayoutParams(-1, -2).apply {
+            leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(2)
+        })
         val cameraBar = android.widget.FrameLayout(this)
         val cameraButton = android.widget.ImageButton(this).apply {
             setImageResource(R.drawable.ic_camera)
@@ -183,7 +275,7 @@ class MainActivity : Activity() {
         quickButton = Button(this).apply {
             textSize = 12f; isAllCaps = false; minWidth = 0; minimumWidth = 0
             setPadding(0, 0, 0, 0); elevation = 0f; stateListAnimator = null
-            setOnClickListener { if (::speech.isInitialized && speech.hasPlayback) stopReplySpeech() else showQuickQuestions() }
+            setOnClickListener { if (stopControlVisible || (::speech.isInitialized && speech.hasPlayback)) stopReplySpeech() else showQuickQuestions() }
         }
         paintButton(quickButton, false)
         cameraBar.addView(quickButton, android.widget.FrameLayout.LayoutParams(dp(120), dp(48), android.view.Gravity.CENTER))
@@ -213,8 +305,10 @@ class MainActivity : Activity() {
                 else if (state.contains("실패") || state == "AUDIO BUSY" || state == "AUDIO INTERRUPTED") stopContinuous()
             }
             if (state != "MUSE IS SPEAKING" && !recording && !sending)
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                releaseScreenAwake()
         }
+        speech.onReading = { text, offset -> screen.followSpeech(text, offset) }
+        speech.onReadingEnd = { screen.endSpeechFollow() }
     }
 
     private fun paintButton(button: Button, selected: Boolean) {
@@ -282,7 +376,7 @@ class MainActivity : Activity() {
     internal fun stopReplySpeech(){
         replySpeechStopped=true
         speech.stop()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        releaseScreenAwake()
         refreshQuickControls()
         updateStatus("READY")
         if(continuous && !sending && !recording)scheduleListening()
@@ -301,7 +395,10 @@ class MainActivity : Activity() {
             UiText.text(this, "음성 메모", "音声メモ", "Voice memos"),
             UiText.text(this, "이전 사진에 이어 질문", "前の写真に続けて質問", "Follow up on photo"),
             UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"),
-            UiText.text(this,"알람·타이머","アラーム・タイマー","Alarms & timers"))
+            UiText.text(this,"알람·타이머","アラーム・タイマー","Alarms & timers"),
+            UiText.text(this,"화면 자동 꺼짐","画面の自動消灯","Screen timeout"),
+            UiText.text(this,"일정·약속 리마인더","予定リマインダー","Appointment reminders"),
+            UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"))
         quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 기능", "クイック機能", "Quick actions"))
             .setItems(labels) { _, which ->
                 when (which) {
@@ -315,6 +412,9 @@ class MainActivity : Activity() {
                     }
                     8 -> showReadingSettings()
                     9 -> if (!BuildConfig.DEMO) showClockPanel()
+                    10 -> showScreenTimeoutSettings()
+                    11 -> if (!BuildConfig.DEMO) showClockPanel(ClockCommand("reminder"))
+                    12 -> showDeskClockSettings()
                     4, 5, 6 -> startActivity(Intent(this, LibraryActivity::class.java).putExtra("mode", when(which) { 4 -> 1; 6 -> 2; else -> 0 }))
                     0, 1 -> startActivity(Intent(this, CameraActivity::class.java).putExtra("translate_photo", which == 0))
                     2 -> showComposer(UiText.text(this, "지금까지 대화의 핵심을 한국어로 짧게 요약해 줘.", "これまでの会話の要点を日本語で短くまとめて。", "Briefly summarize the key points of our conversation in English."), true)
@@ -323,6 +423,28 @@ class MainActivity : Activity() {
             }.setNegativeButton(tr("닫기"), null).create().also { dialog ->
                 dialog.setOnDismissListener { quickDialog = null }; dialog.show()
             }
+    }
+
+    private val keepScreenAwake get() = getSharedPreferences("reading", MODE_PRIVATE).getBoolean("keep_screen_awake", false)
+
+    private fun releaseScreenAwake() {
+        if (keepScreenAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun showScreenTimeoutSettings() {
+        controls = AlertDialog.Builder(this)
+            .setTitle(UiText.text(this, "화면 자동 꺼짐", "画面の自動消灯", "Screen timeout"))
+            .setSingleChoiceItems(arrayOf(
+                UiText.text(this, "켜기 · 일정 시간 후 꺼짐", "オン · 一定時間で消灯", "On · turn off after inactivity"),
+                UiText.text(this, "끄기 · Muse 화면 계속 켜기", "オフ · Muse画面を点灯したまま", "Off · keep Muse screen on")
+            ), if (keepScreenAwake) 1 else 0) { dialog, choice ->
+                getSharedPreferences("reading", MODE_PRIVATE).edit().putBoolean("keep_screen_awake", choice == 1).apply()
+                releaseScreenAwake()
+                dialog.dismiss()
+            }
+            .setNegativeButton(tr("닫기"), null).show()
+        if (keepScreenAwake) controls?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun showReadingSettings() {
@@ -342,6 +464,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshLanguageControls() {
+        refreshBatteryStatus()
         refreshQuickControls()
         conversationButton.text = tr("대화"); modeButton.text = tr("통역")
         displayLanguageButton.text = "${UiText.language(this).flag} ⌄"
@@ -400,7 +523,7 @@ class MainActivity : Activity() {
         sendJob?.cancel(); sendJob = null
         finishRecording(false); speech.stop(); turn++; activeTurn = null
         sending = false; transcriptPending = false; turnTimeout?.cancel()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        releaseScreenAwake()
         if (pending) { disconnect(); if (reconnect && foreground === this) connect() }
         updateStatus("연속 통역 중지")
     }
@@ -520,7 +643,7 @@ class MainActivity : Activity() {
             if (current.replies.getValue(id).isBlank() && continuous) { stopContinuous(); return }
             if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else "ko")
             else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                releaseScreenAwake()
                 if (continuous) scheduleListening()
             }
         }
@@ -529,13 +652,14 @@ class MainActivity : Activity() {
     private var clockPanel:ClockPanel?=null
     private var clockDialog:android.app.Dialog?=null
     internal fun showClockPanel(command:ClockCommand?=null){
+        closeDeskClock()
         if(recording)finishRecording(false)
         if(clockDialog!=null){command?.let{clockPanel?.command(it)};return}
         speech.stop()
         val d=android.app.Dialog(this,R.style.Theme_Muse)
         val panel=ClockPanel(this){d.dismiss()}
         clockPanel=panel;clockDialog=d;d.setContentView(panel.view)
-        d.setOnDismissListener{panel.pause();clockPanel=null;clockDialog=null}
+        d.setOnDismissListener{panel.pause();clockPanel=null;clockDialog=null;refreshClockStatus()}
         d.show()
         d.window?.apply{
             setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,android.view.ViewGroup.LayoutParams.MATCH_PARENT)
@@ -546,9 +670,10 @@ class MainActivity : Activity() {
     }
 
     private fun handleLocalClock(text:String,voice:Boolean):Boolean {
-        val command=LocalClockCommand.parse(text,if(voice)activeLanguageMode.interpreting else languageMode.interpreting)?:return false
+        val interpreting=if(voice)activeLanguageMode.interpreting else languageMode.interpreting
+        val command=ReminderCommand.parse(text,interpreting) ?: LocalClockCommand.parse(text,interpreting) ?: return false
         sending=false;transcriptPending=false;turnTimeout?.cancel()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        releaseScreenAwake()
         val notice=UiText.text(this,"R1 알람·타이머 화면에서 확인해 주세요. 아직 설정을 확정하지 않았습니다.","R1のアラーム画面で確認してください。まだ確定していません。","Confirm on the R1 clock screen. Not scheduled yet.")
         if(!voice)activeTurn=ConversationTurn().also{it.user=text;history.add(it)}
         activeTurn?.replies?.set("local-clock",notice);historyStore.save(history);renderConversation();updateStatus("READY")
@@ -568,9 +693,13 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         foreground = this
-        quickButton.removeCallbacks(playbackControls);quickButton.post(playbackControls)
-        clockPanel?.resume()
         if (BuildConfig.DEMO) { showOfflineDemo(); return }
+        lastInteraction=android.os.SystemClock.elapsedRealtime()
+        if(!batteryRegistered){registerReceiver(batteryReceiver,android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));batteryRegistered=true}
+        if (keepScreenAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        quickButton.removeCallbacks(playbackControls);quickButton.post(playbackControls)
+        clockStatus.removeCallbacks(clockStatusTicker);clockStatus.post(clockStatusTicker)
+        clockPanel?.resume()
         loadHistory()
         shake.reset()
         sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
@@ -595,8 +724,16 @@ class MainActivity : Activity() {
         demoShown = true
         val scene = intent.getStringExtra("demo_scene") ?: "chat"
         history.clear()
-        val user = UiText.text(this, "주말 산책 준비물을 알려줘.", "週末の散歩に何を持っていけばいい？", "What should I pack for a weekend walk?")
-        val answer = UiText.text(this, "물, 편한 신발, 작은 수건을 챙기세요. 출발 전에 날씨도 확인해요.", "水、歩きやすい靴、小さなタオルを。出発前に天気も確認しましょう。", "Bring water, comfortable shoes and a small towel. Check the weather before you leave.")
+        batteryPercent=86; charging=true; refreshBatteryStatus()
+        getSharedPreferences("local_clock", MODE_PRIVATE).edit().remove("entries").commit()
+        if(scene=="alarms" || scene=="home") {
+            val due=System.currentTimeMillis()+3600000
+            val fixtures=org.json.JSONArray().put(org.json.JSONObject().put("id","demo-reminder").put("kind","alarm").put("due",due).put("title","Weekend walk").put("hour",9).put("minute",0))
+            getSharedPreferences("local_clock", MODE_PRIVATE).edit().putString("entries",fixtures.toString()).commit()
+        }
+        refreshClockStatus()
+        val user = UiText.text(this, "산책 준비물을 알려줘.", "散歩の持ち物を教えて。", "What should I bring for a walk?")
+        val answer = UiText.text(this, "물과 편한 신발을 챙기세요. 날씨도 확인해요.", "水と歩きやすい靴を。天気も確認しましょう。", "Bring water and comfortable shoes. Check the weather before leaving.")
         val turn = when (scene) {
             "translate" -> ConversationTurn("가까운 카페가 어디인가요?", linkedMapOf("demo" to "近くのカフェはどこですか？"), "일본어")
             "photo" -> ConversationTurn(UiText.text(this,"[사진] 이 안내문을 번역해 줘.","[写真] この案内を翻訳して。","[Photo] Translate this sign."), linkedMapOf("demo" to UiText.text(this,"OPEN 9:00–18:00\n영업시간: 오전 9시~오후 6시","OPEN 9:00–18:00\n営業時間：午前9時〜午後6時","OPEN 9:00–18:00\nOpening hours: 9 AM to 6 PM")))
@@ -616,6 +753,9 @@ class MainActivity : Activity() {
             ))
             delay(300)
             when (scene) {
+                "clock" -> { deskClock=DeskClockDialog(this@MainActivity,{86}) { deskClock=null };deskClock?.show() }
+                "alarms" -> showClockPanel()
+                "reminder" -> showClockPanel(ClockCommand("reminder",title="Weekend walk"))
                 "settings" -> showReadingSettings()
                 "languages" -> showDisplayLanguages()
                 "keyboard" -> showComposer(UiText.text(this@MainActivity,"일본어로 인사하는 법을 알려줘.","韓国語の挨拶を教えて。","How do I say hello in Korean?"))
@@ -724,6 +864,9 @@ class MainActivity : Activity() {
     internal val hasPlayback get() = speech.hasPlayback
 
     internal fun beginSideButtonRecording(): Boolean {
+        if (deskClock?.isShowing == true) { closeDeskClock(); return false }
+        if (clockDialog?.isShowing == true) return false
+        if (hasPlayback) { stopContinuous(false); stopReplySpeech() }
         if (continuous) { stopContinuous(); return false }
         when {
             !hasWindowFocus() || languageDialog?.isShowing == true || controls?.isShowing == true || clearDialog?.isShowing == true ->
@@ -751,7 +894,7 @@ class MainActivity : Activity() {
         stopContinuous(false)
         finishRecording(false)
         speech.stop()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        releaseScreenAwake()
     }
 
     private fun recordingLimitReached() {
@@ -768,7 +911,7 @@ class MainActivity : Activity() {
         sideButtonRecording = false
         val wav = cappedVoiceNote ?: recorder?.finish()
         cappedVoiceNote = null; recorder = null
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        releaseScreenAwake()
         if (!send || wav == null) {
             if (hasConversation) renderConversation() else screen.showIdle()
             updateStatus(if (send) "HOLD A LITTLE LONGER" else "READY")
@@ -802,7 +945,7 @@ class MainActivity : Activity() {
                 if (connection === current && turn == thisTurn) {
                     stopContinuous(false)
                     sending = false; transcriptPending = false; turnTimeout?.cancel()
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    releaseScreenAwake()
                     updateStatus(if (error is ElevenLabsFailure) "음성 인식 실패 (HTTP ${error.status})" else "인식·전송 실패")
                     screen.showNotice("연결 상태와 ElevenLabs API 권한·잔여 사용량을 확인한 뒤 다시 말해 주세요.")
                 }
@@ -873,7 +1016,7 @@ class MainActivity : Activity() {
                 currentCoroutineContext().ensureActive()
                 if (connection === current) {
                     sending = false; turnTimeout?.cancel()
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    releaseScreenAwake()
                     updateStatus("SEND FAILED")
                     screen.showNotice(UiText.text(this@MainActivity, "전송을 확인하지 못했습니다. 자동 재전송하지 않습니다.", "送信を確認できませんでした。自動再送はしません。", "Delivery could not be confirmed. No automatic retry."))
                 }
@@ -904,7 +1047,7 @@ class MainActivity : Activity() {
                 currentCoroutineContext().ensureActive()
                 if (connection === current) {
                     sending = false; turnTimeout?.cancel()
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    releaseScreenAwake()
                     updateStatus("PHOTO SEND FAILED")
                     screen.showNotice(UiText.text(this@MainActivity, "사진 전송을 확인하지 못했습니다. 자동으로 재전송하지 않습니다.", "写真の送信を確認できませんでした。自動再送はしません。", "Photo delivery could not be confirmed. It will not be resent automatically."))
                 }
@@ -953,7 +1096,28 @@ class MainActivity : Activity() {
         }
     }
 
+    internal fun conversationWheel(event: KeyEvent): Boolean {
+        lastInteraction=android.os.SystemClock.elapsedRealtime()
+        if (!hasWindowFocus() || clockDialog != null || composer?.isShowing == true ||
+            quickDialog?.isShowing == true || controls?.isShowing == true) return false
+        if (event.keyCode !in intArrayOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) return false
+        return screen.scrollConversation(if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1,
+            event.action == KeyEvent.ACTION_DOWN)
+    }
+
+    override fun dispatchGenericMotionEvent(event: android.view.MotionEvent): Boolean {
+        if (event.action == android.view.MotionEvent.ACTION_SCROLL && hasWindowFocus() && clockDialog == null) {
+            val delta = event.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL).let {
+                if (it != 0f) it else event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL)
+            }
+            if (delta != 0f && screen.scrollConversation(if (delta > 0) -1 else 1, true)) return true
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        lastInteraction=android.os.SystemClock.elapsedRealtime()
+        if (conversationWheel(event)) return true
         // The accessibility service owns this gesture globally. Never record via a second path.
         if (event.keyCode == KeyEvent.KEYCODE_PAIRING) {
             if (event.action == KeyEvent.ACTION_UP && SideButtonService.instance == null)
@@ -973,10 +1137,13 @@ class MainActivity : Activity() {
         connected = false; sending = false; turnTimeout?.cancel(); transcriptFetch?.cancel()
         transcriptPending = false
         if (hasConversation && !recording) renderConversation()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); connection?.close(); connection = null
+        releaseScreenAwake(); connection?.close(); connection = null
     }
     override fun onPause() {
+        closeDeskClock()
+        if(batteryRegistered){unregisterReceiver(batteryReceiver);batteryRegistered=false}
         quickButton.removeCallbacks(playbackControls)
+        clockStatus.removeCallbacks(clockStatusTicker)
         clockPanel?.pause()
         displayLanguagePopup?.dismiss()
         stopContinuous(false)

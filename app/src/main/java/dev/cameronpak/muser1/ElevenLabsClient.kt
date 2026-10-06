@@ -46,6 +46,22 @@ internal class ElevenLabsClient(
         return execute(request("/v1/text-to-dialogue?output_format=mp3_44100_128", body), 16_000_000)
     }
 
+    suspend fun synthesizeTimed(text: String, language: String = "ko"): TimedSpeech {
+        require(text.isNotBlank() && text.length <= 1800)
+        val body = JSONObject().put("model_id", "eleven_v4").put("language_code", language)
+            .put("inputs", JSONArray().put(JSONObject().put("text", text).put("voice_id", config.voiceId)))
+            .toString().toRequestBody("application/json".toMediaType())
+        val bytes = try { execute(request("/v1/text-to-dialogue/with-timestamps?output_format=mp3_44100_128", body), 24_000_000) }
+        catch (e: ElevenLabsFailure) {
+            if (e.status !in setOf(400, 404, 422)) throw e
+            return TimedSpeech(synthesize(text, language), emptyList())
+        }
+        val json = JSONObject(bytes.toString(Charsets.UTF_8))
+        val audio = java.util.Base64.getDecoder().decode(json.getString("audio_base64"))
+        if (audio.isEmpty()) throw IOException("Empty audio")
+        return TimedSpeech(audio, SpeechTiming.parse(text, json.optJSONObject("alignment")))
+    }
+
     private fun request(path: String, body: RequestBody) = Request.Builder()
         .url(baseUrl + path).header("xi-api-key", config.apiKey).post(body).build()
 

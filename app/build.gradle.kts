@@ -8,8 +8,8 @@ android {
         applicationId = "dev.cameronpak.muser1"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.2.0"
+        versionCode = 15
+        versionName = "1.5"
         buildConfigField("boolean", "DEMO", "false")
         testInstrumentationRunner = "dev.cameronpak.muser1.DeviceChecks"
     }

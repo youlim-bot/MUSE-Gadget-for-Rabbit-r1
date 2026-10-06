@@ -4,7 +4,9 @@ from pathlib import Path
 adb=[os.environ.get('ADB','adb'),'-d'];pkg='dev.cameronpak.muser1.demo'
 parser=argparse.ArgumentParser(description='Capture only the separate offline demo app on one authorized USB device.')
 parser.add_argument('--output',default=str(Path(__file__).resolve().parents[1]/'docs/images'))
-out=Path(parser.parse_args().output);out.mkdir(parents=True,exist_ok=True)
+parser.add_argument('--only',default='',help='Comma-separated screenshot names, e.g. en-clock,ko-clock')
+args=parser.parse_args()
+out=Path(args.output);out.mkdir(parents=True,exist_ok=True)
 def shell(*a):return subprocess.check_output(adb+['shell',*a],timeout=25)
 def nodes():
  for attempt in range(3):
@@ -26,13 +28,20 @@ def tap(label):
  assert n is not None,label
  x,y,z,w=map(int,re.findall(r'\d+',n.get('bounds')));shell('input','tap',str((x+z)//2),str((y+w)//2));time.sleep(.5)
 def capture(name):
- nodes()
+ time.sleep(2)
+ expected='Sample City' if name.endswith('-clock') else 'Appointment reminder' if name=='en-reminder' else 'Alarms · timers' if name=='en-alarms' else None
+ for attempt in range(8):
+  rows=nodes()
+  if expected is None or any(expected in n.get('text','') for n in rows):break
+  time.sleep(1)
+ else:raise RuntimeError('Expected demo scene is not ready: '+name)
  time.sleep(.7)
  image=subprocess.check_output(adb+['exec-out','screencap','-p'],timeout=20)
  assert image.startswith(b'\x89PNG')
  (out/(name+'.png')).write_bytes(image)
  print('Saved',name,flush=True)
-for lang,scene in [('EN','chat'),('KO','chat'),('JA','chat'),('EN','translate'),('KO','translate'),('EN','photo'),('EN','languages'),('EN','tasks'),('KO','tasks'),('EN','settings')]:
+for lang,scene in [('EN','chat'),('KO','chat'),('JA','chat'),('EN','translate'),('KO','translate'),('EN','photo'),('EN','languages'),('EN','tasks'),('KO','tasks'),('EN','settings'),('EN','clock'),('KO','clock'),('JA','clock'),('EN','alarms'),('EN','reminder'),('EN','home')]:
+ if args.only and lang.lower()+'-'+scene not in args.only.split(','):continue
  shell('input','keyevent','224')
  shell('am','force-stop',pkg)
  shell('am','start','-n',pkg+'/dev.cameronpak.muser1.MainActivity','--es','demo_language',lang,'--es','demo_scene',scene)
