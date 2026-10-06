@@ -60,3 +60,9 @@ adb shell am instrument -w -r -e embeddedMap true \
 ```
 
 Require both a `PASS` stream and `INSTRUMENTATION_CODE: -1`. Do not run the runner without `embeddedMap true`; its other modes have different device/audio requirements. The fixture uses live public map/routing/geocoding services and must not be run in bulk or unattended loops. A single labeled capture is written to app cache; no credentials or user conversations are included.
+
+## Native Google map update (October 6, 2026)
+
+The map renderer is now Maps SDK for Android 19.2.0. On the owner's r1, the opt-in native map fixture passed with `INSTRUMENTATION_CODE: -1`: Google tile loading, the public-landmark route/position and Android geocoding were verified. The fixture keeps its own screen awake and resets its synthetic fix after map initialization to avoid a real GPS update entering the demo capture. This does not change the user's screen timeout. An initial fixture run was rejected by its location guard and produced no shared screenshot.
+
+Source-only public builds use `MUSE_MAPS_SDK_KEY=''` and the offline demo always overrides the manifest key to empty. Normal keyless builds display a setup notice on the map screen. Private builds read the owner's external key file; keyed APKs and merged manifests are not published. JVM tests: 73 passing. Lint remains failed with 15 errors / 40 warnings, including the existing permission/indentation errors. Google Routes API authentication, driving-mode routes and Japanese transit integration remain pending. The new map SDK alone does not enable these features.

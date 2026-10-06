@@ -28,7 +28,7 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 ## Features
 
 - Side-button push-to-talk.
-- **Walking navigation:** a map inside Muse with automatic location tracking, destination search, pedestrian routes and visual next-direction guidance. [Device screenshot](docs/images/ko-walking-map.png). [English](docs/en/GUIDE.md#walking-navigation) · [한국어](docs/ko/GUIDE.md#도보-길찾기) · [日本語](docs/ja/GUIDE.md#徒歩ナビ).
+- **Walking navigation:** a native Google map inside Muse with automatic location tracking, destination search, pedestrian routes and visual next-direction guidance. [Google map screenshot](docs/images/ko-google-map.png). A restricted Maps SDK key is now required; pedestrian routes still use FOSSGIS. [English](docs/en/GUIDE.md#walking-navigation) · [한국어](docs/ko/GUIDE.md#도보-길찾기) · [日本語](docs/ja/GUIDE.md#徒歩ナビ).
 - **Physical volume control:** hold the side button and turn the wheel; an on-screen indicator shows the media volume.
 - Korean, Japanese and English interface; separate speech-input and translation-target controls.
 - Sentence-by-sentence continuous interpretation, with visible start/stop controls.

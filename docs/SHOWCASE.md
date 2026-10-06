@@ -50,3 +50,9 @@ https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1
 ![Muse embedded walking map](images/ko-walking-map.png)
 
 Online map test on Rabbit r1. The origin and destination are public-landmark fixtures (Tokyo Station → Tokyo International Forum), not the owner's live location. No Muse account data appears. Unlike the offline conversation screenshots, this capture exercises live map tiles and pedestrian routing.
+
+## Google Maps SDK update
+
+![Native Google map inside Muse](images/ko-google-map.png)
+
+Actual r1 capture with synthetic public-landmark origin/destination. Google map loading was verified with a locally configured restricted SDK key. The orange walking route still comes from FOSSGIS/OSRM. No key or keyed APK is published.

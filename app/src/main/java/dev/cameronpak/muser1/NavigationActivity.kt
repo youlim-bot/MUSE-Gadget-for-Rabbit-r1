@@ -1,7 +1,6 @@
 package dev.cameronpak.muser1
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -14,12 +13,8 @@ import android.os.*
 import android.provider.Settings
 import android.view.*
 import android.view.inputmethod.InputMethodManager
-import android.webkit.*
 import android.widget.*
 import okhttp3.*
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -31,7 +26,7 @@ class NavigationActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val client = OkHttpClient.Builder().callTimeout(25,TimeUnit.SECONDS).build()
-    private lateinit var map: WebView
+    private lateinit var map: GoogleMapCanvas
     private lateinit var status: TextView
     private lateinit var instruction: TextView
     private lateinit var destination: EditText
@@ -61,14 +56,13 @@ class NavigationActivity : Activity() {
     private fun LinearLayout.item(view:View,weight:Float=1f){addView(view,LinearLayout.LayoutParams(0,dp(34),weight).apply { setMargins(dp(3),0,dp(3),0) })}
     private val listener=object:LocationListener {
         override fun onLocationChanged(location:Location){accept(location)}
-        override fun onProviderDisabled(provider:String){if(!manager.isLocationEnabled){fix=null;status.text=t("위치 기능을 켜 주세요","位置情報を有効にしてください","Enable device location");js("notice(${JSONObject.quote(status.text.toString())})")}}
+        override fun onProviderDisabled(provider:String){if(!manager.isLocationEnabled){fix=null;status.text=t("위치 기능을 켜 주세요","位置情報を有効にしてください","Enable device location");map.notice(status.text.toString())}}
         override fun onProviderEnabled(provider:String){if(active)locate()}
         @Deprecated("Legacy location callback") override fun onStatusChanged(provider:String?,state:Int,extras:Bundle?)=Unit
     }
-    private val timeout=Runnable { if(!fresh(fix)){status.text=t("위치 확인 실패 · 실외에서 재시도","現在地を取得できません・屋外で再試行","No GPS fix · retry outdoors");js("notice(${JSONObject.quote(status.text.toString())})");stopLocation()} }
+    private val timeout=Runnable { if(!fresh(fix)){status.text=t("위치 확인 실패 · 실외에서 재시도","現在地を取得できません・屋外で再試行","No GPS fix · retry outdoors");map.notice(status.text.toString());stopLocation()} }
     private val heartbeat=object:Runnable { override fun run(){if(!active)return;if(fix!=null&&!fresh(fix)){status.text=t("위치가 오래됨 · 재확인 중","現在地を再取得中","Location stale · reacquiring");instruction.text=t("위치가 갱신될 때까지 안내를 기다리세요","位置が更新されるまでお待ちください","Wait for a fresh fix before following guidance")};handler.postDelayed(this,5000)} }
 
-    @SuppressLint("SetJavaScriptEnabled") // Only bundled scripts execute; no remote pages or native account bridge.
     override fun onCreate(state:Bundle?){
         super.onCreate(state)
         window.decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -78,58 +72,30 @@ class NavigationActivity : Activity() {
         search=button(t("찾기","検索","Find")){findDestination()}
         val input=row();input.item(destination,3f);input.item(search,.7f);root.addView(input)
         status=label(11f).apply{text=t("현재 위치 확인 중…","現在地を取得中…","Finding your location…")};root.addView(status,LinearLayout.LayoutParams(-1,dp(24)))
-        map=WebView(this).apply{
-            setBackgroundColor(Color.rgb(21,23,22));settings.javaScriptEnabled=true
-            settings.allowFileAccess=false;settings.allowContentAccess=false;settings.domStorageEnabled=false
-            settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW;settings.setGeolocationEnabled(false)
-            settings.userAgentString=settings.userAgentString+" "+WalkingRoute.USER_AGENT
-            CookieManager.getInstance().setAcceptThirdPartyCookies(this,false)
-            addJavascriptInterface(object{
-                @JavascriptInterface fun choose(lat:Double,lon:Double){
-                    val p=runCatching{MapPoint(lat,lon)}.getOrNull()?:return
-                    runOnUiThread{if(active&&!busy)AlertDialog.Builder(this@NavigationActivity).setMessage(t("이 지점까지 도보 경로를 표시할까요?","この地点までの徒歩ルートを表示しますか？","Show a walking route to this point?"))
-                        .setPositiveButton(t("경로 보기","ルート表示","Show route")){_,_->destination.setText(t("지도에서 선택한 지점","地図で選択した地点","Point selected on map"));requestRoute(p)}.setNegativeButton(UiText.translate(this@NavigationActivity,"취소"),null).show()}
-                }
-            },"MuseMap")
-            webViewClient=object:WebViewClient(){
-                override fun shouldInterceptRequest(view:WebView,request:WebResourceRequest):WebResourceResponse?{
-                    val u=request.url
-                    if(u.scheme=="https"&&u.host=="appassets.androidplatform.net"){
-                        val names=setOf("index.html","leaflet.js","leaflet.css")
-                        val name=u.lastPathSegment
-                        if(u.path=="/map/$name"&&name in names){val mime=when(name){"index.html"->"text/html";"leaflet.js"->"application/javascript";else->"text/css"};return WebResourceResponse(mime,"UTF-8",assets.open("map/$name"))}
-                    }
-                    if(u.scheme=="https"&&u.host=="tile.openstreetmap.org"&&Regex("/\\d+/\\d+/\\d+\\.png").matches(u.path?:""))return null
-                    return WebResourceResponse("text/plain","UTF-8",ByteArrayInputStream(ByteArray(0)))
-                }
-                override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean{
-                    val u=request.url
-                    if(request.hasGesture()&&u.scheme=="https"&&u.host in setOf("www.openstreetmap.org","routing.openstreetmap.de"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,u))}
-                    return true
-                }
-                override fun onPageFinished(view:WebView,url:String){
-                    pageReady=true;js("window.tileError=${JSONObject.quote(t("지도 연결 실패 · 인터넷 확인","地図に接続できません","Map connection failed · check internet"))};notice(${JSONObject.quote(t("현재 위치를 기다리는 중","現在地を取得中","Waiting for location"))})")
-                    if(fresh(fix))updatePosition()
-                    route?.let{draw(it)}
-                }
-            }
-            loadUrl("https://appassets.androidplatform.net/map/index.html")
+        map=GoogleMapCanvas(this).apply {
+            ready={pageReady=true;if(fresh(fix))updatePosition();route?.let{draw(it)}}
+            choose={p->if(active&&!busy)AlertDialog.Builder(this@NavigationActivity)
+                .setMessage(t("이 지점까지 도보 경로를 표시할까요?","この地点までの徒歩ルートを表示しますか？","Show a walking route to this point?"))
+                .setPositiveButton(t("경로 보기","ルート表示","Show route")){_,_->destination.setText(t("지도에서 선택한 지점","地図で選択した地点","Point selected on map"));requestRoute(p)}
+                .setNegativeButton(UiText.translate(this@NavigationActivity,"취소"),null).show()}
+            create(state?.getBundle("google_map"))
         }
         root.addView(map,LinearLayout.LayoutParams(-1,0,1f))
         instruction=label(13f).apply{maxLines=2;text=t("목적지 검색 또는 지도를 길게 누르세요","目的地を検索、または地図を長押し","Search a destination or hold a point on the map");setOnClickListener{showSteps()}}
         root.addView(instruction,LinearLayout.LayoutParams(-1,dp(48)))
-        val controls=row();controls.item(button(t("내 위치","現在地","Locate")){if(fresh(fix))js("center()")else locate()});controls.item(button(t("전체 경로","全ルート","Overview")){route?.let{draw(it)}});controls.item(button(t("재탐색","再検索","Reroute")){selected?.let{requestRoute(it)}?:findDestination()});root.addView(controls)
+        val controls=row();controls.item(button(t("내 위치","現在地","Locate")){if(fresh(fix))map.center()else locate()});controls.item(button(t("전체 경로","全ルート","Overview")){route?.let{draw(it)}});controls.item(button(t("재탐색","再検索","Reroute")){selected?.let{requestRoute(it)}?:findDestination()});root.addView(controls)
+        root.addView(label(9f).apply { text="Route © OpenStreetMap · FOSSGIS/OSRM";setOnClickListener{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("https://routing.openstreetmap.de/about.html")))} },LinearLayout.LayoutParams(-1,dp(18)))
         setContentView(root)
     }
-    private fun js(code:String){if(pageReady&&!isDestroyed)map.evaluateJavascript(code,null)}
-    private fun updatePosition(){val l=fix?:return;js("position(${l.latitude},${l.longitude},${l.accuracy})");updateGuidance()}
-    private fun draw(r:FootRoute){
-        val points=JSONArray();r.points.forEach{points.put(JSONArray().put(it.lat).put(it.lon))};val end=r.points.last()
-        js("drawRoute($points,[${end.lat},${end.lon}])")
-    }
-    override fun onResume(){super.onResume();active=true;map.onResume();locate();handler.post(heartbeat)}
-    override fun onPause(){active=false;stopLocation();handler.removeCallbacks(heartbeat);cancelRequest();map.onPause();super.onPause()}
-    override fun onDestroy(){worker.shutdownNow();map.removeJavascriptInterface("MuseMap");map.destroy();super.onDestroy()}
+    private fun updatePosition(){val l=fix?:return;map.position(point(l),l.accuracy);updateGuidance()}
+    private fun draw(r:FootRoute){map.draw(r)}
+    override fun onStart(){super.onStart();map.start()}
+    override fun onStop(){map.stop();super.onStop()}
+    override fun onLowMemory(){super.onLowMemory();map.lowMemory()}
+    override fun onSaveInstanceState(state:Bundle){val bundle=Bundle();map.save(bundle);state.putBundle("google_map",bundle);super.onSaveInstanceState(state)}
+    override fun onResume(){super.onResume();active=true;map.resume();locate();handler.post(heartbeat)}
+    override fun onPause(){active=false;stopLocation();handler.removeCallbacks(heartbeat);cancelRequest();map.pause();super.onPause()}
+    override fun onDestroy(){worker.shutdownNow();map.destroy();super.onDestroy()}
     private fun permitted()=checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED||checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED
     private fun locate(){
         stopLocation();fix=null
@@ -190,7 +156,7 @@ class NavigationActivity : Activity() {
         if(!fresh(origin)){locate();instruction.text=t("현재 위치 확인 후 재탐색을 누르세요","現在地取得後、再検索してください","Wait for location, then tap Reroute");selected=end;return}
         val now=SystemClock.elapsedRealtime()
         synchronized(rateLock){if(now-lastRouteRequest<1500){instruction.text=t("잠시 후 다시 시도하세요","少し待って再試行してください","Please wait a moment and retry");return};lastRouteRequest=now}
-        selected=end;route=null;js("clearRoute()")
+        selected=end;route=null;map.clearRoute()
         val token=begin();instruction.text=t("도보 경로 계산 중…","徒歩ルートを計算中…","Calculating walking route…")
         val request=Request.Builder().url(WalkingRoute.routeUrl(point(origin!!),end)).header("User-Agent",WalkingRoute.USER_AGENT).build()
         val pending=client.newCall(request);call=pending
@@ -222,9 +188,9 @@ class NavigationActivity : Activity() {
     }
     private fun showSteps(){route?.let{r->AlertDialog.Builder(this).setTitle(t("도보 경로 안내","徒歩ルート案内","Walking directions")).setItems(r.steps.map{stepText(it)}.toTypedArray(),null).setPositiveButton(UiText.translate(this,"닫기"),null).show()}}
     private fun info(){AlertDialog.Builder(this).setTitle(t("Muse 도보 지도","Muse 徒歩マップ","Muse walking map")).setMessage(t(
-        "지도: OpenStreetMap · 경로: FOSSGIS/OSRM. 검색어는 Android 검색 제공자에게, 경로 요청 시 출발·목적지 좌표는 FOSSGIS에 전달됩니다. 지도 서비스는 표시 지역과 IP를 받습니다. 서비스 로그가 남을 수 있습니다. Muse AI에는 보내지 않습니다. 화면을 벗어나면 위치 추적을 멈춥니다.\n\n지도 길게 누르기로 목적지를 선택할 수 있습니다. 화면 안내 전용이며 음성·백그라운드 안내와 자동 재탐색은 없습니다.",
-        "地図: OpenStreetMap・ルート: FOSSGIS/OSRM。検索語はAndroid検索プロバイダーへ、ルート要求時の出発地・目的地座標はFOSSGISへ送信します。地図サービスは表示地域とIPを受け取り、ログを保存する場合があります。Muse AIには送りません。画面を離れると位置取得を停止します。\n\n地図を長押しして目的地を選べます。画面案内のみ。音声・バックグラウンド案内、自動再検索はありません。",
-        "Map: OpenStreetMap · routes: FOSSGIS/OSRM. Search text goes to the Android geocoder; route requests send start/destination coordinates to FOSSGIS. Map services receive the viewed area and IP and may retain logs. Nothing is sent to Muse AI. Tracking stops when you leave this screen.\n\nHold a map point to choose it. Visual guidance only; no voice, background navigation or automatic rerouting."))
+        "지도: Google Maps · 경로: FOSSGIS/OSRM. 검색어는 Android 검색 제공자에게, 경로 요청 시 출발·목적지 좌표는 FOSSGIS에 전달됩니다. 지도 서비스는 표시 지역과 IP를 받습니다. 서비스 로그가 남을 수 있습니다. Muse AI에는 보내지 않습니다. 화면을 벗어나면 위치 추적을 멈춥니다.\n\n지도 길게 누르기로 목적지를 선택할 수 있습니다. 화면 안내 전용이며 음성·백그라운드 안내와 자동 재탐색은 없습니다.",
+        "地図: Google Maps・ルート: FOSSGIS/OSRM。検索語はAndroid検索プロバイダーへ、ルート要求時の出発地・目的地座標はFOSSGISへ送信します。地図サービスは表示地域とIPを受け取り、ログを保存する場合があります。Muse AIには送りません。画面を離れると位置取得を停止します。\n\n地図を長押しして目的地を選べます。画面案内のみ。音声・バックグラウンド案内、自動再検索はありません。",
+        "Map: Google Maps · routes: FOSSGIS/OSRM. Search text goes to the Android geocoder; route requests send start/destination coordinates to FOSSGIS. Map services receive the viewed area and IP and may retain logs. Nothing is sent to Muse AI. Tracking stops when you leave this screen.\n\nHold a map point to choose it. Visual guidance only; no voice, background navigation or automatic rerouting."))
         .setPositiveButton(UiText.translate(this,"닫기"),null).setNeutralButton(t("위치 설정","位置設定","Location settings")){_,_->startActivity(Intent(if(permitted())Settings.ACTION_LOCATION_SOURCE_SETTINGS else Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply{if(!permitted())data=Uri.parse("package:$packageName")} )}.show()}
     companion object { private val rateLock=Any();private var lastRouteRequest=Long.MIN_VALUE/2 }
 }

@@ -1,4 +1,1 @@
 
-# Keep the upstream Leaflet distribution byte-for-byte, including CRLF.
-app/src/main/assets/map/leaflet.css whitespace=cr-at-eol
-app/src/main/assets/map/Leaflet-LICENSE.txt whitespace=cr-at-eol

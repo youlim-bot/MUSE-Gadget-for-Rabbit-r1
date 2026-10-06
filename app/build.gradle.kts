@@ -5,6 +5,8 @@ android {
     compileSdk = 36
     buildFeatures { buildConfig = true }
     defaultConfig {
+        val mapsKeyFile = File(System.getProperty("user.home"), ".config/muse-r1/google-maps-sdk.key")
+        manifestPlaceholders["MUSE_MAPS_KEY"] = System.getenv("MUSE_MAPS_SDK_KEY") ?: (if (mapsKeyFile.isFile) mapsKeyFile.readText().trim() else "")
         applicationId = "dev.cameronpak.muser1"
         minSdk = 29
         targetSdk = 34
@@ -16,6 +18,7 @@ android {
     buildTypes {
         create("demo") {
             initWith(getByName("debug"))
+            manifestPlaceholders["MUSE_MAPS_KEY"] = ""
             applicationIdSuffix = ".demo"
             versionNameSuffix = "-offline-demo"
             buildConfigField("boolean", "DEMO", "true")
@@ -29,6 +32,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-maps:19.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")

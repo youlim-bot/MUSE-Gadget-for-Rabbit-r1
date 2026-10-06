@@ -12,7 +12,7 @@ This is a community prototype. Do not attach tokens, raw device backups, identif
 | Voice memo | Audio to ElevenLabs, then editable text saved locally. No audio archive; not automatically sent to Muse. |
 | Make to-dos | Selected memo text to Muse after confirmation. Reviewed checklist saved separately; original memo retained. |
 | Display history, favorites, memos, checklists | App-private local text files, not separately application-encrypted. Android sandbox/storage security still applies. |
-| Walking navigation | Android geocoder receives destination search text. OSM tiles receive viewed area/IP; normal HTTP tile cache may remain locally. User-triggered route requests send start/destination coordinates to FOSSGIS (server logs may be retained). App position/routes/search results are memory-only; tracking stops when the map is not visible. No location sent to Muse AI. |
+| Walking navigation | Android geocoder receives destination search text. Google Maps SDK receives map-view/location-related requests and IP; SDK map caches may remain locally. User-triggered route requests send start/destination coordinates to FOSSGIS (server logs may be retained). App position/routes/search results are memory-only; tracking stops when the map is not visible. No location sent to Muse AI. |
 | Showcase demo | Separate `.demo` package, synthetic fixtures; no Internet, camera, microphone or location permission. No account needed. |
 
 Clearing local display history does not delete Muse's server-side conversation or separate favorite copies. Uninstalling/clearing app data loses local content and credentials. `adb install -r` preserves app data only with a compatible signature. Keep signing keys private.
@@ -30,3 +30,5 @@ Public demo captures do not contain real device serials, SIM identifiers, networ
 音声は設定に応じてMuseまたはElevenLabsへ送信します。写真は質問送信時にMuseへ送り、音声メモは文字化後に端末保存します。タスク抽出は別の確認後にメモをMuseへ送ります。履歴・お気に入り・メモ・タスクはアプリ専用テキストであり、認証鍵のようなアプリ独自暗号化は施していません。画面履歴の消去はMuseサーバー履歴の削除ではありません。公開画像は別のオフラインアプリのダミーデータです。鍵・バックアップ・識別情報・個人会話をIssueに投稿しないでください。
 
 Navigation privacy / 길찾기 / ナビ: 경로 계산 시 출발지·목적지 좌표가 FOSSGIS에 전송되고, 지도 표시 지역·IP는 지도 서비스에 전달됩니다. 검색어는 Android 검색 제공자에게 전달됩니다. Muse AI에는 보내지 않습니다. ルート計算時に出発地・目的地の座標をFOSSGISへ、表示地域とIPを地図サービスへ、検索語をAndroid検索プロバイダーへ送ります。Muse AIには送りません。サービス側にログが残る場合があります。
+
+Google map builds require a developer-owned key outside the source tree. Use Android package/signing-certificate and Maps SDK API restrictions. The compiled private APK contains that restricted SDK key; do not publish it or generated merged manifests. Public source and offline-demo builds contain no owner key. Pedestrian routing is still FOSSGIS, not Google Routes API.

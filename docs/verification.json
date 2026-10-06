@@ -7,7 +7,7 @@
   "lint": {
     "status": "failed",
     "errors": 15,
-    "warnings": 38,
+    "warnings": 40,
     "error_categories": {
       "MissingPermission": 13,
       "SuspiciousIndentation": 2
@@ -32,7 +32,7 @@
     "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
   },
   "walking_navigation": {
-    "implementation": "embedded Leaflet map + Android Geocoder + FOSSGIS pedestrian OSRM",
+    "implementation": "native Google Maps SDK + Android Geocoder + FOSSGIS pedestrian OSRM",
     "private_apk_installed": true,
     "public_landmark_live_route_verified": true,
     "native_geocoder_verified": true,
@@ -41,5 +41,15 @@
     "voice_guidance": false,
     "background_tracking": false,
     "coordinates_published": "synthetic public landmarks only"
+  },
+  "google_map": {
+    "native_sdk": "19.2.0",
+    "device_fixture": "passed, INSTRUMENTATION_CODE -1",
+    "map_loaded": true,
+    "owner_key_in_public_source": false,
+    "owner_key_in_public_apks": false,
+    "google_routes_api_connected": false,
+    "driving_mode_ready": false,
+    "japan_transit_ready": false
   }
 }

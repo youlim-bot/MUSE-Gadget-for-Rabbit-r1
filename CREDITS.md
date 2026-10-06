@@ -20,4 +20,4 @@ Screenshots show real native app views with fictional offline fixtures and the r
 
 ## Embedded map
 
-Leaflet 1.9.4 (`app/src/main/assets/map/leaflet.js` and `leaflet.css`) is vendored from the official npm release, under BSD-2-Clause; see adjacent `Leaflet-LICENSE.txt`. Map data © OpenStreetMap contributors (ODbL); tiles follow the [OSMF tile policy](https://operations.osmfoundation.org/policies/tiles/). Pedestrian routing is provided by [FOSSGIS/OSRM](https://routing.openstreetmap.de/about.html), under its service usage policy. Attribution remains visible in the map. Android Geocoder supplies destination search. These services are independent of Muse AI.
+The native map uses Google Maps SDK for Android 19.2.0, downloaded as a Gradle dependency under Google's applicable SDK terms. Google branding and attribution remain visible. Existing pedestrian routes still use FOSSGIS/OSRM and OpenStreetMap data, with separate visible attribution. Earlier screenshots show the previous Leaflet/OSM tile renderer; Leaflet assets are no longer bundled. No Google API key or keyed APK is published here.
