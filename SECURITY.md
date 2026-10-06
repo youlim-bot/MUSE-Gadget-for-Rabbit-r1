@@ -27,3 +27,5 @@ Public demo captures do not contain real device serials, SIM identifiers, networ
 ## 日本語
 
 音声は設定に応じてMuseまたはElevenLabsへ送信します。写真は質問送信時にMuseへ送り、音声メモは文字化後に端末保存します。タスク抽出は別の確認後にメモをMuseへ送ります。履歴・お気に入り・メモ・タスクはアプリ専用テキストであり、認証鍵のようなアプリ独自暗号化は施していません。画面履歴の消去はMuseサーバー履歴の削除ではありません。公開画像は別のオフラインアプリのダミーデータです。鍵・バックアップ・識別情報・個人会話をIssueに投稿しないでください。
+
+Local clocks: schedules are kept in separate app-private preferences with Android backup disabled. Supported ElevenLabs transcripts are handled locally before Muse text transport, but transcription still sends recorded audio to ElevenLabs. Manual scheduling uses no network. Exact alarms, notifications, optional full-screen alerts, boot reception, wake lock and foreground audio permissions support on-device ringing. The demo strips these permissions and components. No account keys or personal clock schedules are included in this repository.

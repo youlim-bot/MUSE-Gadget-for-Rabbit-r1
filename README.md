@@ -27,6 +27,9 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 
 ## Features
 
+- **Local r1 alarms and timers:** in-Muse controls, multilingual command confirmation, weekday alarms, timer presets, pause/resume and snooze. Scheduling stays on r1; initial Android permissions are required.
+- **Stop voice:** interrupt the current reply without deleting text. Voice defaults to ON, shown by an orange speaker.
+
 - Side-button push-to-talk.
 - **Physical volume control:** hold the side button and turn the wheel; an on-screen indicator shows the media volume.
 - Korean, Japanese and English interface; separate speech-input and translation-target controls.
@@ -67,7 +70,7 @@ Keep your signing key stable. `install -r` preserves data only when Android acce
 
 ## Verification boundaries
 
-This is a community prototype tested on one LineageOS 21 / Android 14 Rabbit r1. The feature build passed 67 JVM tests and was installed with credentials preserved. The public export is built/tested separately; see [current checks](docs/development.md#public-export-checks). Photos and memo extraction still need end-to-end quality checks against your own Muse account. Camera front/back selection physically rotated the owner's unit; wheel behavior needs hands-on verification. Continuous interpretation is turn-based, not simultaneous streaming translation.
+This is a community prototype tested on one LineageOS 21 / Android 14 Rabbit r1. The feature build passed 78 JVM tests and was installed with credentials preserved. The public export is built/tested separately; see [current checks](docs/development.md#public-export-checks). Photos and memo extraction still need end-to-end quality checks against your own Muse account. Camera front/back selection physically rotated the owner's unit; wheel behavior needs hands-on verification. Continuous interpretation is turn-based, not simultaneous streaming translation.
 
 Firmware flashing wipes data and may prevent booting. Follow the guide's firmware/slot/fastbootd checks; never apply this unit's recovery state to another unit. Firmware images, stock backups, identifiers, credentials, personal screenshots and private avatar images are excluded.
 

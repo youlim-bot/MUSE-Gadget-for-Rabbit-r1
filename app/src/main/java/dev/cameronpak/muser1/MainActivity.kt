@@ -48,6 +48,16 @@ class MainActivity : Activity() {
     private lateinit var quietButton: android.widget.ImageButton
     private lateinit var quickButton: Button
     private var quietMode = false
+    private var replySpeechStopped=false
+    private var stopControlVisible=false
+    private val playbackControls=object:Runnable {
+        override fun run(){
+            if(foreground!==this@MainActivity)return
+            val visible=::speech.isInitialized && speech.hasPlayback
+            if(visible!=stopControlVisible)refreshQuickControls()
+            quickButton.postDelayed(this,200)
+        }
+    }
     private var transcriptPending = false
     private val history = mutableListOf<ConversationTurn>()
     private var activeTurn: ConversationTurn? = null
@@ -173,7 +183,7 @@ class MainActivity : Activity() {
         quickButton = Button(this).apply {
             textSize = 12f; isAllCaps = false; minWidth = 0; minimumWidth = 0
             setPadding(0, 0, 0, 0); elevation = 0f; stateListAnimator = null
-            setOnClickListener { showQuickQuestions() }
+            setOnClickListener { if (::speech.isInitialized && speech.hasPlayback) stopReplySpeech() else showQuickQuestions() }
         }
         paintButton(quickButton, false)
         cameraBar.addView(quickButton, android.widget.FrameLayout.LayoutParams(dp(120), dp(48), android.view.Gravity.CENTER))
@@ -254,15 +264,28 @@ class MainActivity : Activity() {
 
     private fun refreshQuickControls() {
         if (!::quietButton.isInitialized) return
-        quickButton.text = UiText.text(this, "빠른 질문", "クイック質問", "Quick questions")
+        stopControlVisible=::speech.isInitialized && speech.hasPlayback
+        quickButton.text = if(stopControlVisible)UiText.text(this,"■ 음성 정지","■ 音声停止","■ Stop voice")else UiText.text(this, "빠른 기능", "クイック機能", "Quick actions")
+        quickButton.contentDescription=quickButton.text
+        paintButton(quickButton,stopControlVisible)
         quietButton.setImageResource(if (quietMode) R.drawable.ic_quiet else R.drawable.ic_speaker)
-        quietButton.contentDescription = UiText.text(this, if (quietMode) "조용한 모드 켜짐: 음성 답변 켜기" else "조용한 모드 꺼짐: 음성 답변 끄기", if (quietMode) "サイレント ON: 音声を有効にする" else "サイレント OFF: 音声を無効にする", if (quietMode) "Quiet mode on: enable voice" else "Quiet mode off: disable voice")
+        quietButton.imageTintList=android.content.res.ColorStateList.valueOf(if(quietMode)android.graphics.Color.rgb(162,154,142)else android.graphics.Color.BLACK)
+        quietButton.contentDescription = UiText.text(this, if (quietMode) "음성 OFF: 눌러서 켜기" else "음성 ON: 눌러서 끄기", if (quietMode) "音声 OFF: タップしてオン" else "音声 ON: タップしてオフ", if (quietMode) "Voice OFF: tap to enable" else "Voice ON: tap to disable")
         val circle = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(if (quietMode) android.graphics.Color.rgb(255,139,66) else android.graphics.Color.rgb(23,24,23))
+            setColor(if (!quietMode) android.graphics.Color.rgb(255,139,66) else android.graphics.Color.rgb(23,24,23))
             setStroke(1, android.graphics.Color.rgb(55,56,54))
         }
         quietButton.background = android.graphics.drawable.InsetDrawable(circle, (8 * resources.displayMetrics.density).toInt())
+    }
+
+    internal fun stopReplySpeech(){
+        replySpeechStopped=true
+        speech.stop()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        refreshQuickControls()
+        updateStatus("READY")
+        if(continuous && !sending && !recording)scheduleListening()
     }
 
     private fun showQuickQuestions() {
@@ -277,8 +300,9 @@ class MainActivity : Activity() {
             UiText.text(this, "대화 검색", "会話検索", "Search conversations"),
             UiText.text(this, "음성 메모", "音声メモ", "Voice memos"),
             UiText.text(this, "이전 사진에 이어 질문", "前の写真に続けて質問", "Follow up on photo"),
-            UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"))
-        quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 질문", "クイック質問", "Quick questions"))
+            UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"),
+            UiText.text(this,"알람·타이머","アラーム・タイマー","Alarms & timers"))
+        quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 기능", "クイック機能", "Quick actions"))
             .setItems(labels) { _, which ->
                 when (which) {
                     7 -> {
@@ -290,6 +314,7 @@ class MainActivity : Activity() {
                             }.show()
                     }
                     8 -> showReadingSettings()
+                    9 -> if (!BuildConfig.DEMO) showClockPanel()
                     4, 5, 6 -> startActivity(Intent(this, LibraryActivity::class.java).putExtra("mode", when(which) { 4 -> 1; 6 -> 2; else -> 0 }))
                     0, 1 -> startActivity(Intent(this, CameraActivity::class.java).putExtra("translate_photo", which == 0))
                     2 -> showComposer(UiText.text(this, "지금까지 대화의 핵심을 한국어로 짧게 요약해 줘.", "これまでの会話の要点を日本語で短くまとめて。", "Briefly summarize the key points of our conversation in English."), true)
@@ -493,12 +518,42 @@ class MainActivity : Activity() {
         if (done) {
             sending = false; turnTimeout?.cancel(); updateStatus("REPLY RECEIVED")
             if (current.replies.getValue(id).isBlank() && continuous) { stopContinuous(); return }
-            if (!quietMode) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else "ko")
+            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else "ko")
             else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 if (continuous) scheduleListening()
             }
         }
+    }
+
+    private var clockPanel:ClockPanel?=null
+    private var clockDialog:android.app.Dialog?=null
+    internal fun showClockPanel(command:ClockCommand?=null){
+        if(recording)finishRecording(false)
+        if(clockDialog!=null){command?.let{clockPanel?.command(it)};return}
+        speech.stop()
+        val d=android.app.Dialog(this,R.style.Theme_Muse)
+        val panel=ClockPanel(this){d.dismiss()}
+        clockPanel=panel;clockDialog=d;d.setContentView(panel.view)
+        d.setOnDismissListener{panel.pause();clockPanel=null;clockDialog=null}
+        d.show()
+        d.window?.apply{
+            setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        }
+        panel.resume();command?.let{panel.command(it)}
+    }
+
+    private fun handleLocalClock(text:String,voice:Boolean):Boolean {
+        val command=LocalClockCommand.parse(text,if(voice)activeLanguageMode.interpreting else languageMode.interpreting)?:return false
+        sending=false;transcriptPending=false;turnTimeout?.cancel()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val notice=UiText.text(this,"R1 알람·타이머 화면에서 확인해 주세요. 아직 설정을 확정하지 않았습니다.","R1のアラーム画面で確認してください。まだ確定していません。","Confirm on the R1 clock screen. Not scheduled yet.")
+        if(!voice)activeTurn=ConversationTurn().also{it.user=text;history.add(it)}
+        activeTurn?.replies?.set("local-clock",notice);historyStore.save(history);renderConversation();updateStatus("READY")
+        showClockPanel(command)
+        return true
     }
 
     private fun receiveTranscript(text: String) {
@@ -513,6 +568,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         foreground = this
+        quickButton.removeCallbacks(playbackControls);quickButton.post(playbackControls)
+        clockPanel?.resume()
         if (BuildConfig.DEMO) { showOfflineDemo(); return }
         loadHistory()
         shake.reset()
@@ -732,6 +789,7 @@ class MainActivity : Activity() {
                     ensureActive()
                     if (connection !== current || turn != thisTurn) return@launch
                     receiveTranscript(text)
+                    if (handleLocalClock(text, true)) return@launch
                     updateStatus("MUSE에 전송 중")
                     withContext(Dispatchers.IO) { checkNotNull(current).sendText(activeLanguageMode.message(text)) }
                 } else {
@@ -783,7 +841,7 @@ class MainActivity : Activity() {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val message = input.text.toString().trim()
                 if (message.isBlank()) { input.error = UiText.text(this, "내용을 입력해 주세요", "内容を入力してください", "Enter a message"); return@setOnClickListener }
-                if (!connected || connection == null || sending || recording) {
+                if (((!connected || connection == null) && LocalClockCommand.parse(message,languageMode.interpreting)==null) || sending || recording) {
                     input.error = UiText.text(this, "Muse 연결 후 다시 보내 주세요", "Muse接続後に再度送信してください", "Connect to Muse before sending"); return@setOnClickListener
                 }
                 if (photo == null) sendTypedMessage(message, plainConversation)
@@ -798,9 +856,11 @@ class MainActivity : Activity() {
     }
 
     private fun sendTypedMessage(message: String, plainConversation: Boolean = false) {
+        if (!plainConversation && handleLocalClock(message, false)) return
         val current = connection ?: return
         activeLanguageMode = if (plainConversation) languageMode.copy(interpreting = false) else languageMode
         localTranscript = true
+        replySpeechStopped=false
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { it.user = message; history.add(it) }
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
@@ -832,6 +892,7 @@ class MainActivity : Activity() {
         speech.stop()
         activeLanguageMode = languageMode.copy(interpreting = true, target = request.replyLanguage)
         localTranscript = true
+        replySpeechStopped=false
         activeTurn = ConversationTurn().also { it.user = "[사진] " + request.question; history.add(it) }
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
@@ -856,6 +917,7 @@ class MainActivity : Activity() {
     private fun startVoiceTurn() {
         activeLanguageMode = languageMode
         localTranscript = store.elevenLabs() != null
+        replySpeechStopped=false
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { history.add(it) }
         sending = true; transcriptPending = true
         historyStore.save(history)
@@ -914,6 +976,8 @@ class MainActivity : Activity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); connection?.close(); connection = null
     }
     override fun onPause() {
+        quickButton.removeCallbacks(playbackControls)
+        clockPanel?.pause()
         displayLanguagePopup?.dismiss()
         stopContinuous(false)
         SideButtonService.instance?.activityPaused(this)
@@ -933,9 +997,10 @@ class MainActivity : Activity() {
         scope.coroutineContext.cancelChildren()
         super.onStop()
     }
-    override fun onDestroy() { speech.close(); scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { clockDialog?.dismiss();speech.close(); scope.cancel(); super.onDestroy() }
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, permissions, results)
+        clockPanel?.permissionResult(code,results)
         if (code == 2 && results.all { it == PackageManager.PERMISSION_GRANTED }) startPairing()
     }
 

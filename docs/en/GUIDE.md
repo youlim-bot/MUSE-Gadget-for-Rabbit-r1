@@ -157,7 +157,7 @@ Run `python3 scripts/provision-elevenlabs.py` with one r1 attached. It prompts p
 - **Live**: repeat recording → transcription → translation → speech. This is sentence-by-sentence, not simultaneous low-latency streaming. Stop with the same button.
 - **Chat** hides the translation language row. Normal chat uses automatic recognition and the current implementation requests Korean speech output; switching the UI flag alone does not set normal-chat reply language.
 - **Quiet mode** mutes app reply speech, not microphone input or global Android volume.
-- **Quick questions → Text size & voice speed**: 18/20/22/24/26sp and 0.75/1/1.25/1.5×. Speed applies to the next reply; settings persist.
+- **Quick actions → Text size & voice speed**: 18/20/22/24/26sp and 0.75/1/1.25/1.5×. Speed applies to the next reply; settings persist.
 
 For poor recognition, compare the exact spoken and recognized phrase, allow microphone startup, and compare the same phrase with the phone app. Changing TTS voice does not fix STT. Noise and device microphone placement matter.
 
@@ -167,13 +167,13 @@ For poor recognition, compare the exact spoken and recognized phrase, allow micr
 |---|---|
 | Photo question | Camera → capture → Ask Muse → enter question. It sends a resized JPEG; capture alone does not send it. |
 | Photo saving | Choose Save explicitly to save in Android Pictures/Muse. Asking does not automatically save a gallery photo. |
-| Photo text translation | Quick questions → Translate photo text → capture → target language. Translation is a Muse prompt, not offline OCR. |
-| Follow-up photo | Quick questions → Follow up on photo → Ask with same photo. Resends the last image. It is memory-only; process death or Forget photo clears it. |
+| Photo text translation | Quick actions → Translate photo text → capture → target language. Translation is a Muse prompt, not offline OCR. |
+| Follow-up photo | Quick actions → Follow up on photo → Ask with same photo. Resends the last image. It is memory-only; process death or Forget photo clears it. |
 | Keyboard | Bottom-left keyboard icon. Enable Korean, Japanese and English in your Android keyboard (e.g. Gboard); switch with its globe or the Language button. No keyboard engine is bundled. |
-| Quick questions | Editable prompts for conversation summary and simpler explanation. Review before sending. |
-| Favorites | Quick questions → Search conversations → select a turn → Favorite. Favorites are independent saved copies. |
+| Quick actions | Editable prompts for conversation summary and simpler explanation. Review before sending. |
+| Favorites | Quick actions → Search conversations → select a turn → Favorite. Favorites are independent saved copies. |
 | Search | Searches locally displayed questions/answers and saved items; space-separated terms must all match. It does not search all remote Muse history. |
-| Voice memo | Quick questions → Voice memos → Record (up to 20s) → transcribe with ElevenLabs → edit/save text locally. No audio archive and no automatic Muse submission. |
+| Voice memo | Quick actions → Voice memos → Record (up to 20s) → transcribe with ElevenLabs → edit/save text locally. No audio archive and no automatic Muse submission. |
 | Memo to tasks | Open saved memo → Make to-dos → confirm sending memo to Muse → review one task per line → Save list. Up to 50 tasks; original memo remains. Completion checks persist. No reminders/calendar integration. |
 | Avatar | This public build uses the original upstream Muse r1 avatar (see the artwork notice in CREDITS). The owner's custom dolphin was a local image adaptation, not automatic account-avatar synchronization. Replace the drawable only with an asset you can distribute. |
 
@@ -189,3 +189,13 @@ Rakuten Mobile Japan data worked on the owner's unit. It did not require a manua
 - **Task extraction failed:** original memo remains. Retry explicitly; no invented checklist is saved automatically.
 
 See [privacy/data flow](../../SECURITY.md), [verification](../development.md), and the [development journey](JOURNEY.md).
+
+## Local alarms, timers and voice stop
+
+Open **Quick actions → Alarms & timers**. All controls stay in a Muse panel: select hours/minutes, optional weekday repeat, or a 3/5/10-minute timer preset. Swipe the number wheels, then Save/Start. Timers also accept seconds. Pause, resume, delete, snooze five minutes and alarm volume are available. Initial Android permission approval is a system screen.
+
+In conversation mode with ElevenLabs transcription configured, say “timer for 3 minutes”, “wake me at 7 am tomorrow” or “weekday alarm at 8 am”. Typed commands work too. Review the local confirmation and press Start. Supported command phrases are intercepted before sending text to Muse, so they schedule on r1, not a linked Mac. Interpretation mode does not execute them; without ElevenLabs use manual controls for local scheduling.
+
+Schedules are stored on r1 and require no network after confirmation. The device must remain powered on; force-stop prevents alarms, and boot recovery requires unlock. Overdue one-shot schedules are marked off on recovery. Reboot recovery and end-to-end spoken commands remain unverified. Silent alarm volume/DND may suppress sound. Ringing stops automatically after five minutes; notification Stop stops all ringing items.
+
+During speech preparation/playback, the bottom Quick actions button becomes **■ Stop voice**. It stops the current reply and queued audio but preserves the text; the next reply can speak normally. Voice replies default to ON. Orange speaker means ON; dark means OFF. Your explicit quiet-mode choice is retained.

@@ -24,3 +24,9 @@ Library favorites are independent snapshots. Task extraction sends a memo to Mus
 The demo build strips Internet/microphone/camera permissions and the accessibility service, skips account import/connection, and seeds only hard-coded fictional data. Its native UI uses the same view classes. Fixture content must not be confused with a live result.
 
 Read [privacy](../SECURITY.md), [build/verification](development.md), and the language guides for behavior and limitations. Protocol/cryptography provenance remains next to the vendored source.
+
+## Local clock and speech controls
+
+LocalClockCommand parses supported phrases before Muse text transport. ClockPanel is shared between a dialog over the conversation and the Muse-owned lock-screen ClockActivity. LocalClock stores schedules separately in app-private preferences and uses AlarmManager alarm-clock pending intents. ClockReceiver restores schedules on supported lifecycle broadcasts. ClockRingService plays alarm audio as a foreground service with a bounded wake lock. No clock data is sent over the network after scheduling.
+
+MainActivity exposes the stop-voice control while SpeechOutput has queued/active playback, clears it via the existing stop path, and suppresses further speech for that conversation turn. It does not change the persisted quiet preference. Offline demos omit clock permissions/components and cannot schedule real alarms.

@@ -2,12 +2,12 @@
   "date": "2026-10-06",
   "normal_apk_build": "passed",
   "offline_demo_apk_build": "passed",
-  "jvm_tests": 67,
+  "jvm_tests": 78,
   "jvm_failures": 0,
   "lint": {
     "status": "failed",
     "errors": 15,
-    "warnings": 39,
+    "warnings": 38,
     "error_categories": {
       "MissingPermission": 13,
       "SuspiciousIndentation": 2
@@ -31,5 +31,17 @@
     "debug_and_demo_builds": "passed",
     "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
   },
-  "navigation": "removed at user request, including voice routing, Maps SDK and location permissions"
+  "navigation": "removed at user request, including voice routing, Maps SDK and location permissions",
+  "local_clock": {
+    "private_device_checks": "passed: timer pause/resume/cancel, screen-lock firing, ringtone playback state, notification, snooze, next-minute alarm",
+    "inline_forms": "visually checked on r1",
+    "spoken_command_end_to_end": false,
+    "reboot_recovery_verified": false
+  },
+  "stop_voice": {
+    "local_tts_queue_and_button": "passed",
+    "elevenlabs_live_cancellation_tested": false,
+    "voice_default": "on",
+    "on_indicator": "orange"
+  }
 }

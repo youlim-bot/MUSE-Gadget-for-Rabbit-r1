@@ -78,3 +78,11 @@ Source-only public builds use `MUSE_MAPS_SDK_KEY=''` and the offline demo always
 ### Navigation removed (2026-10-06)
 
 Navigation and voice routing were removed at the owner’s request. Earlier navigation sections above describe historical builds only. The current app has no navigation activity, location permissions, Maps SDK dependency or map-key injection. 67 remaining JVM tests passed; private and public APK builds passed. Installed on r1 with credentials, display history and saved library hashes unchanged. The quick menu was inspected to its final settings item and contains no Directions entry. Installed package inspection confirms no navigation activity or location permissions. The device’s app-private Routes key file was removed. Google Cloud configuration was not changed.
+
+### Local clocks and voice controls (2026-10-06)
+
+Private r1 installation preserved credentials, conversation history and saved-library hashes. Hardware checks passed for timer pause/resume/cancellation, firing after screen lock, Ringtone playback state, notification posting, snooze rescheduling, and next-minute alarm firing/stopping. Test schedules were removed. Local queued/TTS playback exposed Stop voice; tapping cleared playback, suppressed that reply and restored Quick actions without changing quiet mode. No Muse message or ElevenLabs API request was made by these checks. Cloud TTS cancellation follows the existing stop path but was not separately exercised.
+
+The simplified inline alarm/timer forms were visually inspected on the 480×640 r1, including preset selection and visible top/bottom controls. Spoken-command end-to-end, human acoustic confirmation and reboot recovery remain unverified. 78 JVM tests pass. Public source builds and security checks are repeated for this publication. Historical verification counts above apply to their respective earlier builds.
+
+Publication lint: 15 existing errors / 38 warnings; no lint findings in the new Clock/LocalClock source files. General lint remains failing and is not represented as a passed check.
