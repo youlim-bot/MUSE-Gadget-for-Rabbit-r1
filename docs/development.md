@@ -13,7 +13,7 @@ Normal APK: `app/build/outputs/apk/debug/app-debug.apk`. This repository publish
 
 The October 6, 2026 export built the normal and offline-demo APKs and passed **67 JVM tests**. The demo package was installed on the owner's Rabbit r1 for synthetic screenshots. The normal export APK was **not** installed over the owner's customized private build; the owner's original avatar, credentials and data are preserved. The preceding feature build had been installed and its reading/speed preferences checked on-device.
 
-Current lint: **15 errors / 36 warnings** (13 permission-analysis errors and 2 vendored indentation errors). See [verification.json](verification.json) for executed checks. APK/test success does not imply clean lint. Live Muse image understanding, memo extraction quality, physical wheel timing, speech-speed listening comparisons, battery life and other firmware builds remain separate checks.
+Current lint: **15 errors / 38 warnings** (13 permission-analysis errors and 2 vendored indentation errors). See [verification.json](verification.json) for executed checks. APK/test success does not imply clean lint. Live Muse image understanding, memo extraction quality, physical wheel timing, speech-speed listening comparisons, battery life and other firmware builds remain separate checks.
 
 No GitHub Actions workflow is enabled: builds/tests run locally, avoiding runner use. Existing upstream instrumentation is retained for reference but has not been rerun in this export, and may require adaptation for the customized layout. Never run its default/live recording modes on a personal device just to capture pictures.
 
@@ -45,3 +45,7 @@ The gallery is captured at the existing r1 480×640 / density 200 configuration.
 `python3 scripts/check-public-tree.py` checks local documentation links and obvious private-artifact patterns. It is a targeted prepublication check, not a guarantee of a complete secret/security audit. Vendored licenses and provenance must be retained.
 
 The generalized ElevenLabs provisioning tool is syntax/mock checked; this publication task did not submit an API key or generate audio. Actual model/voice availability must be checked using the reader's account.
+
+## Walking navigation checks (October 6, 2026)
+
+Normal APK build and **70 JVM tests passed**. New tests cover multilingual URI encoding/parameter injection, destination validation and fix freshness/accuracy. The private feature APK was updated on the owner's r1 with credential/history/library hashes unchanged. Foreground location permission and a live fix with reported accuracy around 16 m were verified; Google Maps was installed. A real destination route and outdoor turn-by-turn guidance have not yet been verified. No actual coordinates are published. Lint retains 15 existing errors; the two additional warnings concern the new activity's fixed orientation. The public normal APK is still not installed over the private avatar build.

@@ -2,12 +2,12 @@
   "date": "2026-10-06",
   "normal_apk_build": "passed",
   "offline_demo_apk_build": "passed",
-  "jvm_tests": 67,
+  "jvm_tests": 70,
   "jvm_failures": 0,
   "lint": {
     "status": "failed",
     "errors": 15,
-    "warnings": 36,
+    "warnings": 38,
     "error_categories": {
       "MissingPermission": 13,
       "SuspiciousIndentation": 2
@@ -30,5 +30,14 @@
     "matches_upstream_bytes": true,
     "debug_and_demo_builds": "passed",
     "jvm_tests": "not rerun for artwork-only refresh; preceding 67-test result retained"
+  },
+  "walking_navigation": {
+    "private_apk_installed": true,
+    "foreground_location_fix_verified": true,
+    "reported_accuracy_m_approx": 16,
+    "google_maps_installed": true,
+    "real_route_verified": false,
+    "outdoor_turn_by_turn_verified": false,
+    "coordinates_published": false
   }
 }

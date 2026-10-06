@@ -24,3 +24,7 @@ Library favorites are independent snapshots. Task extraction sends a memo to Mus
 The demo build strips Internet/microphone/camera permissions and the accessibility service, skips account import/connection, and seeds only hard-coded fictional data. Its native UI uses the same view classes. Fixture content must not be confused with a live result.
 
 Read [privacy](../SECURITY.md), [build/verification](development.md), and the language guides for behavior and limitations. Protocol/cryptography provenance remains next to the vendored source.
+
+### Walking navigation
+
+`NavigationActivity` requests foreground Android LocationManager fixes and stops updates on pause or timeout. `WalkingRoute` validates fix age/accuracy and encodes the destination for a package-scoped Google Maps walking intent. No background location, coordinate storage or Muse location transmission is involved.

@@ -277,7 +277,8 @@ class MainActivity : Activity() {
             UiText.text(this, "대화 검색", "会話検索", "Search conversations"),
             UiText.text(this, "음성 메모", "音声メモ", "Voice memos"),
             UiText.text(this, "이전 사진에 이어 질문", "前の写真に続けて質問", "Follow up on photo"),
-            UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"))
+            UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"),
+            UiText.text(this, "도보 길찾기", "徒歩ナビ", "Walking navigation"))
         quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 질문", "クイック質問", "Quick questions"))
             .setItems(labels) { _, which ->
                 when (which) {
@@ -290,6 +291,7 @@ class MainActivity : Activity() {
                             }.show()
                     }
                     8 -> showReadingSettings()
+                    9 -> if (!BuildConfig.DEMO) startActivity(Intent(this, NavigationActivity::class.java))
                     4, 5, 6 -> startActivity(Intent(this, LibraryActivity::class.java).putExtra("mode", when(which) { 4 -> 1; 6 -> 2; else -> 0 }))
                     0, 1 -> startActivity(Intent(this, CameraActivity::class.java).putExtra("translate_photo", which == 0))
                     2 -> showComposer(UiText.text(this, "지금까지 대화의 핵심을 한국어로 짧게 요약해 줘.", "これまでの会話の要点を日本語で短くまとめて。", "Briefly summarize the key points of our conversation in English."), true)

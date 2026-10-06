@@ -12,7 +12,8 @@ This is a community prototype. Do not attach tokens, raw device backups, identif
 | Voice memo | Audio to ElevenLabs, then editable text saved locally. No audio archive; not automatically sent to Muse. |
 | Make to-dos | Selected memo text to Muse after confirmation. Reviewed checklist saved separately; original memo retained. |
 | Display history, favorites, memos, checklists | App-private local text files, not separately application-encrypted. Android sandbox/storage security still applies. |
-| Showcase demo | Separate `.demo` package, synthetic fixtures; no Internet, camera or microphone permission. No account needed. |
+| Walking navigation | Foreground-only location fix, held in memory; no coordinate logging, persistence or transmission to Muse. Google Maps receives the destination and obtains current location itself for guidance. |
+| Showcase demo | Separate `.demo` package, synthetic fixtures; no Internet, camera, microphone or location permission. No account needed. |
 
 Clearing local display history does not delete Muse's server-side conversation or separate favorite copies. Uninstalling/clearing app data loses local content and credentials. `adb install -r` preserves app data only with a compatible signature. Keep signing keys private.
 
@@ -27,3 +28,5 @@ Public demo captures do not contain real device serials, SIM identifiers, networ
 ## 日本語
 
 音声は設定に応じてMuseまたはElevenLabsへ送信します。写真は質問送信時にMuseへ送り、音声メモは文字化後に端末保存します。タスク抽出は別の確認後にメモをMuseへ送ります。履歴・お気に入り・メモ・タスクはアプリ専用テキストであり、認証鍵のようなアプリ独自暗号化は施していません。画面履歴の消去はMuseサーバー履歴の削除ではありません。公開画像は別のオフラインアプリのダミーデータです。鍵・バックアップ・識別情報・個人会話をIssueに投稿しないでください。
+
+Navigation privacy / 길찾기 / ナビ: 좌표는 Muse로 전송하거나 저장하지 않습니다. Google 지도가 자체 권한으로 현재 위치와 목적지를 사용합니다. 座標はMuseへ送信・保存しません。Google マップが自身の権限で現在地と目的地を使用します。

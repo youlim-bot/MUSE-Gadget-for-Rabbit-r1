@@ -189,3 +189,11 @@ Rakuten Mobile Japan data worked on the owner's unit. It did not require a manua
 - **Task extraction failed:** original memo remains. Retry explicitly; no invented checklist is saved automatically.
 
 See [privacy/data flow](../../SECURITY.md), [verification](../development.md), and the [development journey](JOURNEY.md).
+
+## Walking navigation
+
+Open **Quick questions → Walking navigation** (scroll to the bottom). Allow precise location **while using the app**, enter a destination name/address, and press **Start walking navigation**. The starting location is detected automatically. Google Maps must be installed; the screen includes an install/open shortcut. Google Maps handles the map, walking route and guidance; this is not an embedded map engine.
+
+Muse waits up to 45 seconds for a fix with reported accuracy within 100 m and age within two minutes. If it cannot obtain one, enable device location/precise permission and retry near a window or outdoors. A stale fix is refreshed; press Start again when ready. Accuracy is an estimate, not a guarantee. Availability of routes/guidance depends on Google Maps and your region/connectivity.
+
+Location checks run only while this screen is visible and stop on leaving it. Coordinates are not logged, saved or sent to Muse. The launch URI contains only the destination and walking mode; Google Maps obtains the live starting position with its own permissions. The offline showcase demo does not launch navigation or request location.
