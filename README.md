@@ -27,7 +27,8 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 
 ## Features
 
-- Side-button push-to-talk; wheel + side-button media-volume control.
+- Side-button push-to-talk.
+- **Physical volume control:** hold the side button and turn the wheel; an on-screen indicator shows the media volume.
 - Korean, Japanese and English interface; separate speech-input and translation-target controls.
 - Sentence-by-sentence continuous interpretation, with visible start/stop controls.
 - Optional ElevenLabs recognition and speech; Android TTS fallback when ElevenLabs is not configured.
@@ -35,6 +36,20 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 - Keyboard input through the Android keyboard/IME; quiet mode; editable quick questions.
 - Favorites, local conversation search, voice-to-text memos, reviewed memo-to-task checklists.
 - Persistent conversation text size (18–26sp) and speech speed (0.75–1.5×).
+
+## Volume control · 볼륨 조절 · 音量調整
+
+**English:** With Muse open and the screen unlocked, **hold the side button and turn the scroll wheel**. Up raises media volume; down lowers it. An on-screen speaker indicator shows the level. Once the wheel moves, that button press controls volume: any recording started by the hold is discarded, and releasing the button does not send it or lock the screen.
+
+**한국어:** Muse 화면이 열리고 잠금이 해제된 상태에서 **측면 버튼을 누른 채 스크롤 휠을 돌리세요.** 위로 돌리면 미디어 볼륨이 커지고, 아래로 돌리면 작아집니다. 화면에 스피커와 볼륨 단계가 표시됩니다. 휠을 돌린 누름은 볼륨 조작으로 처리하므로, 이미 시작된 녹음은 버리고 버튼을 떼어도 전송하거나 화면을 잠그지 않습니다.
+
+**日本語:** Museを開き、画面のロックを解除した状態で、**サイドボタンを押しながらスクロールホイールを回します。** 上でメディア音量を上げ、下で下げます。画面のスピーカー表示で音量を確認できます。ホイールを動かした操作は音量調整として扱われ、開始済みの録音は破棄されます。ボタンを離しても送信や画面ロックは行いません。
+
+| | English | 한국어 | 日本語 |
+|---|---|---|---|
+| Setup | Enable **Side button controls** and the keylayout mapping described in the guide. | 가이드의 버튼 매핑과 **Side button controls** 활성화가 필요합니다. | ガイドのボタン割り当てと **Side button controls** の有効化が必要です。 |
+| Scope | Adjusts Android media volume. Quiet mode separately controls whether Muse reads replies aloud. | Android 미디어 볼륨을 조절합니다. 조용한 모드는 Muse 답변을 읽을지 별도로 정합니다. | Androidのメディア音量を調整します。サイレントモードはMuseの回答読み上げを別途切り替えます。 |
+| Camera | Camera mode uses the wheel for front/back camera selection instead. | 카메라 모드에서는 휠을 전면·후면 전환에 사용합니다. | カメラモードではホイールを前面・背面の切り替えに使います。 |
 
 ## Build
 
