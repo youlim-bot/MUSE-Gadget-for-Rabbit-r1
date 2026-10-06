@@ -28,8 +28,6 @@ Based on [Cameron Pak's muse-r1](https://github.com/cameronapak/muse-r1), snapsh
 ## Features
 
 - Side-button push-to-talk.
-- **Voice directions:** say “Navigate to Tokyo Station by car” with ElevenLabs transcription configured, then choose the destination match. Korean, Japanese and English command phrases are supported in conversation mode.
-- **Walking navigation:** a native Google map inside Muse with automatic location tracking, destination search, pedestrian routes and visual next-direction guidance. [Walk](docs/images/ko-google-walk.png) / [Drive](docs/images/ko-google-drive.png). Separate restricted Maps SDK and Routes API keys are required. Walk and Drive use Google Routes API; driving estimates exclude current traffic. Japan transit is not available. [English](docs/en/GUIDE.md#walking-navigation) · [한국어](docs/ko/GUIDE.md#도보-길찾기) · [日本語](docs/ja/GUIDE.md#徒歩ナビ).
 - **Physical volume control:** hold the side button and turn the wheel; an on-screen indicator shows the media volume.
 - Korean, Japanese and English interface; separate speech-input and translation-target controls.
 - Sentence-by-sentence continuous interpretation, with visible start/stop controls.
@@ -69,7 +67,7 @@ Keep your signing key stable. `install -r` preserves data only when Android acce
 
 ## Verification boundaries
 
-This is a community prototype tested on one LineageOS 21 / Android 14 Rabbit r1. The feature build passed 86 JVM tests and was installed with credentials preserved. The public export is built/tested separately; see [current checks](docs/development.md#public-export-checks). Photos and memo extraction still need end-to-end quality checks against your own Muse account. Camera front/back selection physically rotated the owner's unit; wheel behavior needs hands-on verification. Continuous interpretation is turn-based, not simultaneous streaming translation.
+This is a community prototype tested on one LineageOS 21 / Android 14 Rabbit r1. The feature build passed 67 JVM tests and was installed with credentials preserved. The public export is built/tested separately; see [current checks](docs/development.md#public-export-checks). Photos and memo extraction still need end-to-end quality checks against your own Muse account. Camera front/back selection physically rotated the owner's unit; wheel behavior needs hands-on verification. Continuous interpretation is turn-based, not simultaneous streaming translation.
 
 Firmware flashing wipes data and may prevent booting. Follow the guide's firmware/slot/fastbootd checks; never apply this unit's recovery state to another unit. Firmware images, stock backups, identifiers, credentials, personal screenshots and private avatar images are excluded.
 

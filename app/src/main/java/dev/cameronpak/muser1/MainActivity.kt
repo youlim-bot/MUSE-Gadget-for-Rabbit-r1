@@ -277,8 +277,7 @@ class MainActivity : Activity() {
             UiText.text(this, "대화 검색", "会話検索", "Search conversations"),
             UiText.text(this, "음성 메모", "音声メモ", "Voice memos"),
             UiText.text(this, "이전 사진에 이어 질문", "前の写真に続けて質問", "Follow up on photo"),
-            UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"),
-            UiText.text(this, "길찾기", "ルート検索", "Directions"))
+            UiText.text(this, "글자 크기·음성 속도", "文字サイズ・音声速度", "Text size & voice speed"))
         quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 질문", "クイック質問", "Quick questions"))
             .setItems(labels) { _, which ->
                 when (which) {
@@ -291,7 +290,6 @@ class MainActivity : Activity() {
                             }.show()
                     }
                     8 -> showReadingSettings()
-                    9 -> if (!BuildConfig.DEMO) startActivity(Intent(this, NavigationActivity::class.java))
                     4, 5, 6 -> startActivity(Intent(this, LibraryActivity::class.java).putExtra("mode", when(which) { 4 -> 1; 6 -> 2; else -> 0 }))
                     0, 1 -> startActivity(Intent(this, CameraActivity::class.java).putExtra("translate_photo", which == 0))
                     2 -> showComposer(UiText.text(this, "지금까지 대화의 핵심을 한국어로 짧게 요약해 줘.", "これまでの会話の要点を日本語で短くまとめて。", "Briefly summarize the key points of our conversation in English."), true)
@@ -501,19 +499,6 @@ class MainActivity : Activity() {
                 if (continuous) scheduleListening()
             }
         }
-    }
-
-    private fun openVoiceDirections(text:String):Boolean {
-        val command=VoiceDirections.parse(text,activeLanguageMode.interpreting)?:return false
-        sending=false;transcriptPending=false;turnTimeout?.cancel()
-        stopContinuous(false)
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val notice=if(command.transit) UiText.text(this,"일본 대중교통 경로는 아직 지원하지 않습니다.","日本の公共交通ルートはまだ対応していません。","Transit routes in Japan are not supported yet.")
-            else UiText.text(this,"길찾기에서 목적지 후보를 선택해 주세요.","ルート検索で目的地候補を選択してください。","Choose a destination match in Directions.")
-        activeTurn?.replies?.set("local-directions",notice);historyStore.save(history);renderConversation();updateStatus("READY")
-        if(command.transit) AlertDialog.Builder(this).setMessage(notice).setPositiveButton(tr("닫기"),null).show()
-        else startActivity(Intent(this,NavigationActivity::class.java).putExtra("destination_query",command.query).putExtra("travel_mode",command.mode.name))
-        return true
     }
 
     private fun receiveTranscript(text: String) {
@@ -747,7 +732,6 @@ class MainActivity : Activity() {
                     ensureActive()
                     if (connection !== current || turn != thisTurn) return@launch
                     receiveTranscript(text)
-                    if (openVoiceDirections(text)) return@launch
                     updateStatus("MUSE에 전송 중")
                     withContext(Dispatchers.IO) { checkNotNull(current).sendText(activeLanguageMode.message(text)) }
                 } else {

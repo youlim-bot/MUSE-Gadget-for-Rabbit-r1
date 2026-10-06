@@ -189,19 +189,3 @@ Rakuten Mobile Japan data worked on the owner's unit. It did not require a manua
 - **Task extraction failed:** original memo remains. Retry explicitly; no invented checklist is saved automatically.
 
 See [privacy/data flow](../../SECURITY.md), [verification](../development.md), and the [development journey](JOURNEY.md).
-
-## Walking navigation
-
-Open **Quick questions → Directions**. The Google map is displayed inside Muse. Allow location while using the app, search for a destination or hold a map point, then select **Walk** or **Drive**. Changing modes clears the previous route and requests a new one. Tap the instruction card for all steps. Locate, Overview and Reroute control the view.
-
-Routes use Google Routes API. Driving estimates do not include current traffic. Walking routes are beta and may omit sidewalks or pedestrian paths; tap the warning for full details. If the returned road route begins away from your location, the app shows the straight-line distance to its start; this is not a navigable connector. Japan transit is unavailable through Google Routes API; the Transit button explains this limitation. See [Google's coverage FAQ](https://developers.google.com/maps/faq#transit_directions_countries).
-
-This is foreground visual guidance, without voice/background navigation or automatic rerouting. Location updates stop when leaving the map. Outdoor movement has not been verified. Search requires an Android geocoder provider. Internet connectivity is required.
-
-Enable Maps SDK for Android and Routes API with billing. Create separate restricted keys. Configure the map key outside Git at `~/.config/muse-r1/google-maps-sdk.key` (mode 600), or through local `MUSE_MAPS_SDK_KEY`. Restrict it to Maps SDK and your Android package/signing certificate. Restrict the separate Routes key to Routes API and the same package/certificate. Run `python3 scripts/provision-google-routes.py` with your USB debug device connected, then open Directions to encrypt/import the key and delete staging. The app sends package/certificate headers; validate rejection of an incorrect app identity for your key. Never publish keys or a keyed APK. Public demo builds use no map key.
-
-**Privacy:** destination text goes to Android's geocoder; route origin/destination coordinates go to Google. Google Maps receives map/location-related requests and IP and may cache data; provider logs may remain. These are not sent to Muse AI. App route/location data stay in memory. The Routes key is stored separately with Android Keystore encryption.
-
-## Voice directions
-
-In conversation mode, hold the side button and say “Navigate to Tokyo Station by car” or “Take me to Akebonobashi Station on foot”. With ElevenLabs transcription configured, supported Korean/Japanese/English commands open Directions and search for destination candidates. Select the correct result before routing. An omitted travel mode defaults to walking; Japanese transit requests show an unsupported notice. Interpretation mode never triggers navigation. Matching is phrase-based, not arbitrary natural-language understanding; other requests continue to Muse. Without ElevenLabs the existing Muse voice path remains unchanged. Recognized commands are handled locally after transcription and are not sent to Muse AI. The destination input is taller and stays visible when the keyboard opens.

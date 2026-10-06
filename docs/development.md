@@ -74,3 +74,7 @@ Source-only public builds use `MUSE_MAPS_SDK_KEY=''` and the offline demo always
 ### Voice directions (2026-10-06)
 
 86 JVM tests pass. A synthetic Japanese command opened Drive mode and destination candidates on the physical r1; the taller address field stayed fully visible with the keyboard confirmed visible. Microphone-to-route end-to-end recognition is not yet verified. Existing credentials, history, library and encrypted Routes key were preserved. No microphone or Muse message was used in this check.
+
+### Navigation removed (2026-10-06)
+
+Navigation and voice routing were removed at the owner’s request. Earlier navigation sections above describe historical builds only. The current app has no navigation activity, location permissions, Maps SDK dependency or map-key injection. 67 remaining JVM tests passed; private and public APK builds passed. Installed on r1 with credentials, display history and saved library hashes unchanged. The quick menu was inspected to its final settings item and contains no Directions entry. Installed package inspection confirms no navigation activity or location permissions. The device’s app-private Routes key file was removed. Google Cloud configuration was not changed.

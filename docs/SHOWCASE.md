@@ -44,19 +44,3 @@ Cameron Pakさんのmuse-r1をベースに、LineageOSを導入したRabbit r1�
 https://github.com/youlim-bot/MUSE-Gadget-for-Rabbit-r1
 
 画像は架空データを使ったオフラインデモであり、実際のAI回答の検証画面ではありません。コミュニティの試作版で、一部の機能は追加の実利用検証が必要です。原作者Cameron Pakさんとr1コミュニティに感謝します。フィードバック歓迎です！
-
-## Embedded walking map
-
-![Muse embedded walking map](images/ko-walking-map.png)
-
-Online map test on Rabbit r1. The origin and destination are public-landmark fixtures (Tokyo Station → Tokyo International Forum), not the owner's live location. No Muse account data appears. Unlike the offline conversation screenshots, this capture exercises live map tiles and pedestrian routing.
-
-## Google Maps SDK update
-
-![Native Google map inside Muse](images/ko-google-map.png)
-
-Actual r1 capture with synthetic public-landmark origin/destination. Google map loading was verified with a locally configured restricted SDK key. The orange walking route still comes from FOSSGIS/OSRM. No key or keyed APK is published.
-
-## Google Routes mode selection
-
-[Walk](images/ko-google-walk.png) · [Drive](images/ko-google-drive.png). Physical r1 captures using synthetic public-landmark coordinates (Tokyo Station → Tokyo International Forum); no owner location, account, or conversation data. Route requests use live Google Routes API. These captures are separate from the offline demo.

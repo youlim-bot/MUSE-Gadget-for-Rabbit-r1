@@ -24,9 +24,3 @@ Library favorites are independent snapshots. Task extraction sends a memo to Mus
 The demo build strips Internet/microphone/camera permissions and the accessibility service, skips account import/connection, and seeds only hard-coded fictional data. Its native UI uses the same view classes. Fixture content must not be confused with a live result.
 
 Read [privacy](../SECURITY.md), [build/verification](development.md), and the language guides for behavior and limitations. Protocol/cryptography provenance remains next to the vendored source.
-
-### Walking navigation
-
-`NavigationActivity` embeds `GoogleMapCanvas`, a native Google Maps SDK MapView with lifecycle forwarding, automatic foreground position, gesture-aware following and route polylines. There is no navigation WebView or JavaScript bridge. Map long-press requires confirmation before requesting a route. The SDK key is injected from local configuration into the manifest; missing configuration produces a setup notice. Google attribution remains visible.
-
-Android Geocoder supplies destination search. FOSSGIS/OSRM still calculates the pedestrian route; Google Routes API authentication is a separate pending integration. No driving or Japanese public-transit routing is claimed. Location and route data are not sent to Muse AI. External-service data handling is described in SECURITY.md.
