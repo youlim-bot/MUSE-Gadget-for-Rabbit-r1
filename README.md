@@ -1,4 +1,4 @@
-# MUSE Gadget for Rabbit r1
+# MUSE Gadget for Rabbit r1 — V1.0
 
 **[English guide](docs/en/GUIDE.md) · [한국어 가이드](docs/ko/GUIDE.md) · [日本語ガイド](docs/ja/GUIDE.md)**
 
