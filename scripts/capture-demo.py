@@ -42,7 +42,7 @@ def capture(name):
  assert image.startswith(b'\x89PNG')
  (out/(name+'.png')).write_bytes(image)
  print('Saved',name,flush=True)
-for lang,scene in [('EN','chat'),('KO','chat'),('JA','chat'),('EN','translate'),('KO','translate'),('EN','photo'),('EN','languages'),('EN','tasks'),('KO','tasks'),('EN','settings'),('EN','reading'),('EN','quick'),('EN','clock'),('KO','clock'),('JA','clock'),('EN','alarms'),('EN','reminder'),('EN','home'),('EN','pet-egg'),('KO','pet-egg'),('JA','pet-egg'),('EN','pet-baby'),('EN','pet-adult'),('KO','pet-adult'),('JA','pet-adult'),('EN','pet-food'),('EN','pet-play'),('EN','pet-music'),('EN','pet-agent')]:
+for lang,scene in [('EN','avatar-speaking'),('EN','avatar-charging'),('EN','chat'),('KO','chat'),('JA','chat'),('EN','translate'),('KO','translate'),('EN','photo'),('EN','languages'),('EN','tasks'),('KO','tasks'),('EN','settings'),('EN','reading'),('EN','quick'),('EN','clock'),('KO','clock'),('JA','clock'),('EN','alarms'),('EN','reminder'),('EN','home'),('EN','pet-egg'),('KO','pet-egg'),('JA','pet-egg'),('EN','pet-baby'),('EN','pet-adult'),('KO','pet-adult'),('JA','pet-adult'),('EN','pet-food'),('EN','pet-play'),('EN','pet-music'),('EN','pet-agent')]:
  if args.only and lang.lower()+'-'+scene not in args.only.split(','):continue
  shell('input','keyevent','224')
  shell('am','force-stop',pkg)

@@ -377,13 +377,7 @@ class MainActivity : Activity() {
         quietButton = android.widget.ImageButton(this).apply {
             setPadding(0, 0, 0, 0); minimumWidth = 0; minimumHeight = 0; elevation = 0f; stateListAnimator = null
             setOnClickListener {
-                quietMode = !quietMode
-                getSharedPreferences("reply_options", MODE_PRIVATE).edit().putBoolean("quiet", quietMode).apply()
-                if (quietMode) {
-                    speech.stop()
-                    if (continuous && !sending && !recording) scheduleListening()
-                }
-                refreshQuickControls()
+                toggleReplyMute()
                 android.widget.Toast.makeText(this@MainActivity, UiText.text(this@MainActivity, if (quietMode) "조용한 모드 켜짐" else "음성 답변 켜짐", if (quietMode) "サイレントモード ON" else "音声応答 ON", if (quietMode) "Quiet mode on" else "Voice replies on"), android.widget.Toast.LENGTH_SHORT).show()
             }
         }
@@ -481,6 +475,15 @@ class MainActivity : Activity() {
     private val inPetMode get()=petRoom?.isShowing==true
     private var petRewardedTurn:ConversationTurn?=null
     private var activePetTurn=false
+    private var petDialogueTurn:PetDialogueTurn?=null
+    private var petDialogueRoom:PetRoom?=null
+    private fun preparePetDialogue() {
+        missionPhoto=null;missionConversation=null;missionChunks.clear();missionDone.clear()
+        petDialogueRoom=petRoom?.takeIf { it.isShowing }
+        petDialogueTurn=petDialogueRoom?.let { PetDialogueTurn(it.dialogueState(),it.practiceLanguage ?: UiText.language(this).name.lowercase(java.util.Locale.ROOT),it.activityContext()) }
+    }
+    internal val petConversationActivity get()=when { recording->"listening";sending->"thinking";speech.hasPlayback->"speaking";else->"" }
+
     private fun showPetRoom() {
         if(recording || sending || petRoom!=null)return
         stopContinuous(false);speech.stop();closeDeskClock()
@@ -488,9 +491,43 @@ class MainActivity : Activity() {
         room.setOnDismissListener { petRoom=null;lastInteraction=android.os.SystemClock.elapsedRealtime() }
         room.show()
     }
-    internal fun petType() { showComposer(plainConversation=true) }
-    internal fun petTools() { showQuickQuestions() }
+    internal fun petPractice(language:String?) { petRoom?.practiceLanguage=language }
+    internal fun petMemoryText():String? {
+        val current=history.lastOrNull { !it.user.isNullOrBlank() && it.replies.values.any { reply->reply.isNotBlank() } }?:return null
+        return (current.user.orEmpty()+"\n\n"+current.replies.values.joinToString("\n")).take(1200)
+    }
+    internal fun petMissionCamera(seed:Long,token:String,target:Int) {
+        if(!connected || sending || recording){android.widget.Toast.makeText(this,funText("Muse 연결 후 시도해 주세요","Museに接続してから試してね","Connect to Muse first"),android.widget.Toast.LENGTH_LONG).show();return}
+        val lang=when(UiText.language(this)){DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH;else->InputLanguage.KOREAN}
+        startActivity(Intent(this,CameraActivity::class.java).putExtra("hunt_prompt",PetActivityText.target(this,target))
+            .putExtra("hunt_language",lang.name).putExtra("pet_seed",seed).putExtra("pet_mission_token",token).putExtra("pet_mission_target",target))
+    }
+    private var missionPhoto:PhotoQuestion.Request?=null
+    private var missionConversation:ConversationTurn?=null
+    private val missionChunks=mutableMapOf<String,String>()
+    private val missionDone=mutableSetOf<String>()
+    override fun onNewIntent(next:Intent) { super.onNewIntent(next);setIntent(next);openPetPromise() }
+    private fun openPetPromise() {
+        val id=intent?.getStringExtra(PetPromises.EXTRA)?:return
+        if(recording || sending)return
+        intent.removeExtra(PetPromises.EXTRA)
+        showPetRoom();petRoom?.showPromise(id)
+    }
+    internal fun petType(preset:String?=null) { showComposer(preset,plainConversation=true) }
+    internal val petInputBusy get()=recording || sending
     internal fun petStopSpeech() { stopReplySpeech() }
+    internal val replyMuted get() = quietMode
+    internal fun toggleReplyMute() {
+        quietMode = !quietMode
+        getSharedPreferences("reply_options", MODE_PRIVATE).edit().putBoolean("quiet", quietMode).apply()
+        if (quietMode) {
+            speech.stop()
+            if (continuous && !sending && !recording) scheduleListening()
+        }
+        refreshQuickControls()
+        petRoom?.refreshReplyMute()
+    }
+
     internal fun petRefresh() {
         val current=activeTurn ?: history.lastOrNull()
         val text=current?.let { listOf(it.user.orEmpty(), it.replies.values.joinToString("\n\n")).filter { part -> part.isNotBlank() }.joinToString("\n\n") }
@@ -866,16 +903,34 @@ class MainActivity : Activity() {
 
     private fun receiveReply(id: String, text: String, done: Boolean) {
         val current = activeTurn ?: return
-        current.replies[id] = if (done && text.isNotEmpty()) text else current.replies.getOrDefault(id, "") + text
+        var missionReply:String?=null
+        val mission=missionPhoto?.takeIf { current===missionConversation }
+        if(mission!=null) {
+            if(id in missionDone)return
+            val full=if(done && text.isNotEmpty())text else missionChunks.getOrDefault(id,"")+text
+            if(!done){missionChunks[id]=full;return}
+            missionDone.add(id);missionChunks.remove(id)
+            val result=PetMission.parse(full)
+            missionReply=result?.reply ?: funText("사진을 판정하지 못했어요. 보상은 지급되지 않았어요. 다시 촬영해 주세요.","写真を判定できませんでした。報酬は付与されていません。もう一度撮ってね。","I couldn't verify the photo. No reward was granted. Please try another photo.")
+            val seed=mission.petSeed
+            if(result?.matched==true && seed!=null && !PetStore(this).load(System.currentTimeMillis()).let { it.seed!=seed || it.dead }) {
+                val granted=PetActivitiesStore(this).completeMission(seed,mission.petMissionToken.orEmpty())
+                if(granted)missionReply+="\n"+funText("미션 성공! 방 꾸미기에 새 장식이 생겼어요.","ミッション達成！お部屋に新しい飾りが増えたよ。","Mission complete! A new room decoration is available.")
+            }
+        }
+        val petAnswer = petDialogueTurn?.receive(id,text,done)
+        if(petDialogueTurn!=null && petAnswer==null)return
+        current.replies[id] = missionReply ?: petAnswer?.text ?: if (done && text.isNotEmpty()) text else current.replies.getOrDefault(id, "") + text
         historyStore.save(history)
         renderConversation()
         if (done) {
             if(inPetMode && current !== petRewardedTurn && current.replies.getValue(id).isNotBlank()) {
                 petRoom?.agentReward();petRewardedTurn=current
             }
+            if(petAnswer!=null && petRoom===petDialogueRoom && inPetMode)petRoom?.answerExpression(petAnswer.expression)
             sending = false; turnTimeout?.cancel(); updateStatus("REPLY RECEIVED")
             if (current.replies.getValue(id).isBlank() && continuous) { stopContinuous(); return }
-            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else if(funModes.mode=="practice" && !activePetTurn)funModes.language.code!! else "ko")
+            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), petDialogueTurn?.language ?: if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else if(funModes.mode=="practice" && !activePetTurn)funModes.language.code!! else "ko")
             else {
                 releaseScreenAwake()
                 if (continuous) scheduleListening()
@@ -935,6 +990,7 @@ class MainActivity : Activity() {
         }
         lastInteraction=android.os.SystemClock.elapsedRealtime()
         if(returnToSettings) { returnToSettings=false;showSettingsMenu() }
+        openPetPromise()
         settingsDialog?.refreshStatus()
         if(!batteryRegistered){registerReceiver(batteryReceiver,android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED));batteryRegistered=true}
         if (keepScreenAwake) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -991,7 +1047,7 @@ class MainActivity : Activity() {
         }
         history.add(turn); historyLoaded = true
         languageMode = LanguageMode(scene == "translate", InputLanguage.KOREAN, InputLanguage.JAPANESE)
-        quietMode = true; refreshLanguageControls(); renderConversation()
+        quietMode = scene != "avatar-speaking"; refreshLanguageControls(); refreshQuickControls(); renderConversation()
         status.text = "OFFLINE DEMO · SAMPLE DATA"
         scope.launch {
             historyStore.save(history)
@@ -1003,6 +1059,8 @@ class MainActivity : Activity() {
             ))
             delay(300)
             when (scene) {
+                "avatar-speaking" -> screen.setState("MUSE IS SPEAKING")
+                "avatar-charging" -> { screen.setState("READY");screen.setCharging(true) }
                 "clock" -> { deskClock=DeskClockDialog(this@MainActivity,{86}) { deskClock=null };deskClock?.show() }
                 "alarms" -> showClockPanel()
                 "reminder" -> showClockPanel(ClockCommand("reminder",title="Weekend walk"))
@@ -1189,7 +1247,8 @@ class MainActivity : Activity() {
         val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
         val current = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, (current.toLong() + steps).coerceIn(min.toLong(), max.toLong()).toInt(), 0)
-        screen.showVolume(audio.getStreamVolume(AudioManager.STREAM_MUSIC), max)
+        val volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (inPetMode) petRoom?.showMediaVolume(volume, max) else screen.showVolume(volume, max)
     }
 
     internal fun prepareForLock() {
@@ -1236,9 +1295,9 @@ class MainActivity : Activity() {
                     receiveTranscript(text)
                     if ((activePetTurn || funModes.mode!="practice") && handleLocalClock(text, true)) return@launch
                     updateStatus("MUSE에 전송 중")
-                    withContext(Dispatchers.IO) { checkNotNull(current).sendText(if(funModes.mode=="practice" && !activePetTurn) practicePayload(text) else activeLanguageMode.message(text)) }
+                    withContext(Dispatchers.IO) { checkNotNull(current).sendText(petDialogueTurn?.payload(text) ?: if(funModes.mode=="practice" && !activePetTurn) practicePayload(text) else activeLanguageMode.message(text)) }
                 } else {
-                    val userId = withContext(Dispatchers.IO) { checkNotNull(current).sendVoice(wav) }
+                    val userId = withContext(Dispatchers.IO) { checkNotNull(current).sendVoice(wav, petDialogueTurn?.payload(null).orEmpty()) }
                     if (connection === current && turn == thisTurn && transcriptPending) fetchTranscript(current!!, userId, thisTurn)
                 }
             }
@@ -1307,12 +1366,13 @@ class MainActivity : Activity() {
         localTranscript = true
         replySpeechStopped=false
         activePetTurn=inPetMode
+        preparePetDialogue()
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { it.user = message; history.add(it) }
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "Muse에 전송 중", "Museに送信中", "Sending to Muse"))
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val payload = if(funModes.mode=="practice" && !plainConversation && !inPetMode) practicePayload(message) else activeLanguageMode.message(message)
+        val payload = petDialogueTurn?.payload(message) ?: if(funModes.mode=="practice" && !plainConversation && !inPetMode) practicePayload(message) else activeLanguageMode.message(message)
         sendJob = scope.launch {
             try { withContext(Dispatchers.IO) { current.sendText(payload) } }
             catch (error: Exception) {
@@ -1334,19 +1394,22 @@ class MainActivity : Activity() {
         val request = PhotoQuestion.pending ?: return
         PhotoQuestion.pending = null
         val current = connection ?: return
-        PhotoQuestion.last = request
+        PhotoQuestion.last = request.copy(petSeed=null,petMissionToken=null,petMissionTarget=-1)
+        missionPhoto=request.takeIf { it.petSeed!=null && it.petMissionToken!=null && it.petMissionTarget in 0..2 };missionChunks.clear();missionDone.clear()
         speech.stop()
         activeLanguageMode = languageMode.copy(interpreting = true, target = request.replyLanguage)
         localTranscript = true
         replySpeechStopped=false
         activePetTurn=inPetMode
+        petDialogueTurn=null;petDialogueRoom=null
         activeTurn = ConversationTurn().also { it.user = "[사진] " + request.question; history.add(it) }
+        missionConversation=if(missionPhoto!=null)activeTurn else null
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "사진을 Muse에 전송 중", "写真をMuseに送信中", "Sending photo to Muse"))
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         sendJob = scope.launch {
-            try { withContext(Dispatchers.IO) { current.sendPhoto(request.jpeg, request.question) } }
+            try { withContext(Dispatchers.IO) { current.sendPhoto(request.jpeg, if(missionPhoto===request)PetMission.prompt(request.petMissionTarget,request.replyLanguage.code?:"ko") else request.question) } }
             catch (error: Exception) {
                 currentCoroutineContext().ensureActive()
                 if (connection === current) {
@@ -1362,10 +1425,11 @@ class MainActivity : Activity() {
     }
 
     private fun startVoiceTurn() {
-        activeLanguageMode = if(inPetMode)languageMode.copy(interpreting=false) else if(funModes.mode=="practice")languageMode.copy(interpreting=false,input=funModes.language) else languageMode
+        activeLanguageMode = if(inPetMode)languageMode.copy(interpreting=false,input=InputLanguage.entries.firstOrNull { it.code==petRoom?.practiceLanguage }?:languageMode.input) else if(funModes.mode=="practice")languageMode.copy(interpreting=false,input=funModes.language) else languageMode
         localTranscript = store.elevenLabs() != null
         replySpeechStopped=false
         activePetTurn=inPetMode
+        preparePetDialogue()
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { history.add(it) }
         sending = true; transcriptPending = true
         historyStore.save(history)

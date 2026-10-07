@@ -202,7 +202,7 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
                 photo.setImageBitmap(if (bitmap != null && degrees != 0f) android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, android.graphics.Matrix().apply { postRotate(degrees) }, true) else bitmap)
                 photo.visibility = View.VISIBLE; surface.visibility = View.GONE
                 capture.visibility = View.GONE; retake.visibility = View.VISIBLE; save.visibility = View.VISIBLE; save.isEnabled = true; ask.visibility = View.VISIBLE; ask.isEnabled = true
-                photoTools.visibility = View.VISIBLE; translatePhoto.isEnabled = true
+                photoTools.visibility = if(intent.hasExtra("pet_mission_token"))View.GONE else View.VISIBLE; translatePhoto.isEnabled = true
                 if(intent.hasExtra("hunt_prompt")) {
                     val lang=InputLanguage.entries.firstOrNull{it.name==intent.getStringExtra("hunt_language") && it!=InputLanguage.AUTO} ?: InputLanguage.KOREAN
                     askMuse(intent.getStringExtra("hunt_prompt"),lang)
@@ -230,6 +230,7 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
             setText(preset ?: t("이 사진에 무엇이 보이는지 한국어로 설명해 줘.", "この写真に何が写っているか日本語で説明して。", "Describe what you see in this photo in English."))
             filters = arrayOf(android.text.InputFilter.LengthFilter(1000))
             minLines = 2; maxLines = 4
+            if(intent.hasExtra("pet_mission_token")){setText(PetActivityText.target(this@CameraActivity,intent.getIntExtra("pet_mission_target",0)));isEnabled=false}
         }
         android.app.AlertDialog.Builder(this)
             .setTitle(t("사진으로 Muse에 질문", "写真でMuseに質問", "Ask Muse about photo"))
@@ -265,7 +266,7 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
                             translatePhoto.isEnabled = true; ask.isEnabled = true; retake.isEnabled = true; save.isEnabled = true
                             info.text = t("사진 준비 실패. 다시 촬영해 주세요.", "写真の準備に失敗しました。撮り直してください。", "Photo preparation failed. Retake the photo.")
                         } else {
-                            PhotoQuestion.pending = PhotoQuestion.Request(compressed, question, replyLanguage)
+                            PhotoQuestion.pending = PhotoQuestion.Request(compressed, question, replyLanguage, if(intent.hasExtra("pet_seed"))intent.getLongExtra("pet_seed",0) else null, intent.getStringExtra("pet_mission_token"), intent.getIntExtra("pet_mission_target",-1))
                             finish()
                         }
                     }

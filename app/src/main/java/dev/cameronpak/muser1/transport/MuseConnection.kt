@@ -14,7 +14,6 @@ import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicBoolean
 
 class MuseConnection(
     private var credentials: DeviceCredentials,
@@ -45,8 +44,6 @@ class MuseConnection(
     private val replies = ReplyTracker(onUserTranscript, onReply)
     private var transcriptAfterSeq = 0L
 
-    companion object { private val sdkReportAttempted=AtomicBoolean(false) }
-
     private class Vm(val token: String, val id: String)
     private class Stream(val path: String, val complete: CompletableDeferred<Unit>?, val limit: Int) {
         var status = 0
@@ -57,15 +54,8 @@ class MuseConnection(
     suspend fun connect() {
         onStatus("Connecting");onDiagnostic("account_start")
         try {
-            // Match the official SDK: report the SDK token via a startup refresh.
-            // A refused optional refresh must never erase an existing pairing.
-            if(!sdkToken.isNullOrBlank() && sdkReportAttempted.compareAndSet(false,true)) {
-                onDiagnostic("sdk_refresh_start")
-                try { refresh() } catch(error:Exception) {
-                    currentCoroutineContext().ensureActive()
-                    onDiagnostic("sdk_refresh_unavailable")
-                }
-            }
+            // Check the saved access token first. Restarting or updating the UI must not
+            // rotate an otherwise usable pairing just to report the SDK token.
             var vm = fetchVm(credentials.accessToken)
             if (vm == null) { onDiagnostic("refresh_start");refresh();onDiagnostic("account_retry");vm = fetchVm(credentials.accessToken) }
             if(vm==null)onDiagnostic("vm_unavailable")
@@ -86,7 +76,7 @@ class MuseConnection(
         sendChat(PhotoPayload.encode(jpeg, question))
     }
 
-    suspend fun sendVoice(wav: ByteArray): String? {
+    suspend fun sendVoice(wav: ByteArray, context: String = ""): String? {
         require(wav.size in 45..640044)
         val item = JSONObject().put("type", "file").put("mime_type", "audio/wav")
             .put("filename", "voice_note.wav").put("data_base64", Base64.getEncoder().encodeToString(wav))
@@ -102,7 +92,7 @@ class MuseConnection(
             null
         }
         // Our voice-mode tests returned server errors; Android speaks the working text-mode reply.
-        val messageId = sendChat(JSONObject().put("message", "").put("output_modality", "text")
+        val messageId = sendChat(JSONObject().put("message", context).put("output_modality", "text")
             .put("items", JSONArray().put(item)).toString().toByteArray(), before)
         return messageId.takeIf { before != null }
     }
@@ -193,7 +183,7 @@ class MuseConnection(
             if(response.code==401 || response.code==403)authenticationRejected=true
             if (response.code == 401) return null
             check(response.isSuccessful) { "Muse account request failed" }
-            val list = JSONObject(response.body?.string().orEmpty()).optJSONArray("vm_list") ?: return null
+            val list = checkNotNull(JSONObject(response.body?.string().orEmpty()).optJSONArray("vm_list")) { "Muse instance list missing" }
             var first: Vm? = null
             for (i in 0 until list.length()) {
                 val item = list.optJSONObject(i) ?: continue
@@ -204,7 +194,7 @@ class MuseConnection(
                 if (first == null) first = vm
                 if (item.optBoolean("default")) return vm
             }
-            return first
+            return checkNotNull(first) { "Muse instance unavailable" }
         }
     }
 

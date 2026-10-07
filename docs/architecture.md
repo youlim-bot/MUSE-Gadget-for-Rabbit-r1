@@ -40,3 +40,70 @@ MainActivity exposes the stop-voice control while SpeechOutput has queued/active
 `PetState` implements deterministic five-minute simulation steps, hidden incubation, needs, health, temperament, adult forms and death. `PetStore` persists the simulation in app-private preferences and archives migrations/new eggs. `PetRoom`, `PetScene` and `PetMotion` render the room, animation and mini-games. `PetAudio` and `PetSoundtrack` manage local music/effects with speech priority. Agent requests remain owned by MainActivity and the existing Muse session; the pet never receives a second credential store. `MuseSettingsDialog` groups settings and opens Android's Wi-Fi panel without handling passwords.
 
 ClockWeather now requests hourly UV plus daily maximum UV and keeps cache freshness bounded by the forecast hour. Connection diagnostics retain stage names and HTTP codes only, never tokens, response bodies or URLs. Reconnect attempts are bounded and do not silently replay an interrupted user request.
+
+### Pet voice and wheel controls
+
+The pet toolbar's speaker toggles the same persisted `reply_options.quiet` setting
+as the main screen. Muting stops current response playback and suppresses future
+spoken responses; microphone input remains available. Music and effects retain
+their separate settings. The former Reply button is now View chat.
+
+A physical side-button press uses `SideButtonGesture` inside `PetRoom`. While
+pressed, either DPAD wheel events or generic rotary events adjust media volume
+and show the level inside the pet screen. The first wheel event cancels the
+voice hold timer and discards an owned recording. Releasing that press cannot
+send audio, choose care, or score a mini-game. Focus loss cancels the gesture.
+The dedicated unpaired-emulator `petControls` fixture checks mute state, both
+wheel paths, release/focus cancellation, normal selection, and mini-game routing.
+
+### Avatar effects and startup authentication
+
+The conversation avatar uses thicker 5 dp voice bars with 10–26 dp animated
+heights, and a filled 26 dp charging bolt. Their positions stay inside the compact
+portrait. Native offline previews cover speaking and charging states.
+
+Account startup now tries the saved access token first. Only an unauthorized
+account response triggers one refresh and one lookup retry. SDK-token presence,
+restart, server errors, and empty VM lists do not trigger an unconditional refresh.
+Five intercepted HTTP regression checks cover these cases without real tokens or
+network requests; both working copies passed 121 JVM tests. The prior server
+refusal's cause is not established by this change.
+
+
+### State-aware pet conversation (local build)
+
+Pet-room voice and keyboard turns snapshot the current stage, temperament and
+qualitative needs. The prompt deliberately omits growth counters, seeds and
+hatching thresholds. It asks Muse to answer the user's question in the selected
+UI language with one optional expression from a closed visual-only list (wave,
+dance, jump, nod, shake, cheer, think). Typed and ElevenLabs-transcribed input use
+the same prompt; the native voice-note path attaches it as the message alongside
+the existing WAV item. Non-pet turns keep their existing payloads.
+
+`PetDialogueTurn` buffers response fragments until completion. Only the parsed
+reply enters display history and speech. Unknown actions are ignored, ordinary
+prose remains readable, and malformed structured replies produce a localized
+retry message. A response ID completes once and at most one expression runs per
+turn. The originating dialog identity prevents late replies animating a newly
+opened pet room. Care and progression are never changed by model action fields.
+
+The pet stays visible beside a scrollable response in the dialogue view.
+Recording/waiting/playback show listening/thinking/speaking poses. Completed
+answers can animate the character, subject to egg, sleep, illness and energy
+gates. Reduced-motion settings remain respected. Reply mute and side-button
+volume keep their existing semantics. This does not add unsolicited speech,
+background listening or autonomous external actions.
+
+
+### Pet special activities
+
+The pet room's **Special activities** button opens six local pages: solo
+exploration, daily diary, memory chest, earned room decorations, photo missions,
+and recurring R1 promises. Care controls remain in the room and are not repeated
+inside this menu. See [special-activities.md](special-activities.md).
+
+Activities are isolated by companion identity. Expedition claims and mission
+rewards persist atomically. Only explicitly confirmed camera submissions enter
+photo verification; starting a typed or voice turn clears the previous mission
+state. Reminders use local Android scheduling and never auto-send an agent request.
+Conversation, diary and memory actions use the existing reviewable composer.

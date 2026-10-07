@@ -35,6 +35,8 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     private var selected=0
     private var selectedTile=1
     private var press=-1L
+    private val sideGesture=SideButtonGesture()
+    private lateinit var replyMuteButton:ImageButton
     private var gameEnds=0L
     private var nextStar=0L
     private var star=0
@@ -48,6 +50,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     private var previousTick=0L
     private var messageUntil=0L
     private var effect=""
+    private lateinit var dialogueScene:PetScene
     private lateinit var agentPane:LinearLayout
     private lateinit var agentText:TextView
     private lateinit var agentStatus:TextView
@@ -55,19 +58,37 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     private var held=false
     private var voiceOwned=false
     private val voiceHold=Runnable {
-        if(press>=0 && hasWindowFocus()) { held=true;voiceOwned=host.petBeginVoice();showAgent() }
+        if(sideGesture.hold(SystemClock.uptimeMillis(),hasWindowFocus() && !inGame)==SideButtonGesture.Action.HOLD) {
+            held=true;voiceOwned=host.petBeginVoice();showAgent()
+        }
     }
     private fun endVoice(send:Boolean) { if(voiceOwned)host.petEndVoice(send);voiceOwned=false;held=false }
-    internal fun cancelAgentInput() { handler.removeCallbacks(voiceHold);endVoice(false);press=-1 }
+    internal fun cancelAgentInput() { handler.removeCallbacks(voiceHold);sideGesture.cancel();endVoice(false);press=-1 }
     private fun showAgent() { if(inGame)finishGame(false,false);room.hatchStarted=0L;agentPane.visibility=View.VISIBLE }
     internal fun agentUpdate(status:String, text:String?=null, reveal:Boolean=false) {
         if(!::agentPane.isInitialized)return
-        agentStatus.showText(status)
+        agentStatus.showText(when(status) {
+            "REPLY RECEIVED" -> t("답변 도착", "返事が届きました", "Reply received")
+            "LISTENING" -> t("듣고 있어요", "聞いているよ", "Listening")
+            "SENDING VOICE NOTE" -> t("생각하고 있어요", "考えているよ", "Thinking")
+            else -> status
+        })
         text?.let { agentText.showText(it) }
         if(reveal)showAgent()
     }
-    internal fun agentReward() { val before=pet.level;pet=pet.agentInteraction(System.currentTimeMillis());room.react(if(pet.level>before)"level" else "heart");save();render() }
+    internal fun agentReward() { record("chat");val before=pet.level;pet=pet.agentInteraction(System.currentTimeMillis());room.react(if(pet.level>before)"level" else "heart");save();render() }
 
+    internal var practiceLanguage:String?=null
+    internal fun activityContext():String = org.json.JSONObject()
+        .put("away_on_expedition",onTrip)
+        .put("room_decoration",PetActivityText.item(context,activitiesStore.decoration(pet.seed)))
+        .put("conversation_practice_language",practiceLanguage ?: "none").toString()
+    internal fun dialogueState():PetState { pet=pet.advance(System.currentTimeMillis());return pet }
+    internal fun answerExpression(expression:PetExpression) {
+        val action=PetDialogue.allowed(expression,dialogueState())
+        if(action==PetExpression.NONE)return
+        room.react(action.motion);dialogueScene.react(action.motion)
+    }
     private val inGame get()=gameEnds>0L
     private fun t(ko:String,ja:String,en:String)=UiText.text(context,ko,ja,en)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
@@ -86,9 +107,20 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         store=PetStore(context);pet=store.load(System.currentTimeMillis())
         val root=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(6),dp(12),dp(6));setBackgroundColor(cream) }
         val header=LinearLayout(context).apply { gravity=Gravity.CENTER_VERTICAL }
-        val title=label(17f).apply { text=if(BuildConfig.DEMO) "MUSE · DEMO" else "MUSE";gravity=Gravity.START or Gravity.CENTER_VERTICAL;typeface=Typeface.DEFAULT_BOLD;maxLines=1 }
+        val title=label(17f).apply { text=if(BuildConfig.DEMO) "MUSE · DEMO" else "MUSE";gravity=Gravity.START or Gravity.CENTER_VERTICAL;typeface=Typeface.DEFAULT_BOLD;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(8,17,1,android.util.TypedValue.COMPLEX_UNIT_SP) }
         header.addView(title,LinearLayout.LayoutParams(0,-1,1f))
         header.addView(button("↺"){confirmNewEgg()}.apply { contentDescription=t("알부터 다시 시작","たまごからやり直す","Start from an egg") },LinearLayout.LayoutParams(dp(48),dp(48)).apply { rightMargin=dp(4) })
+        replyMuteButton=ImageButton(context).apply {
+            setPadding(dp(12),dp(12),dp(12),dp(12))
+            background=panel(Color.rgb(232,229,207),12f)
+            setOnClickListener {
+                host.toggleReplyMute()
+                if(host.replyMuted)say("음성 답변 꺼짐 · 말하기는 가능해요","音声応答オフ · 話しかけられます","Voice replies off · You can still talk")
+                else say("음성 답변 켜짐","音声応答オン","Voice replies on")
+            }
+        }
+        header.addView(replyMuteButton,LinearLayout.LayoutParams(dp(48),dp(48)).apply { rightMargin=dp(4) })
+        refreshReplyMute()
         header.addView(button("♫"){showSoundSettings()}.apply { contentDescription=t("배경음과 효과음","BGMと効果音","Music and sounds") },LinearLayout.LayoutParams(dp(48),dp(48)).apply { rightMargin=dp(4) })
         header.addView(button(t("나가기","戻る","Exit")){dismiss()},LinearLayout.LayoutParams(dp(64),dp(48)))
         root.addView(header,LinearLayout.LayoutParams(-1,dp(48)))
@@ -108,11 +140,15 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         roomStack.addView(room,FrameLayout.LayoutParams(-1,-1))
         agentPane=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(6),dp(12),dp(6));background=panel(0xffe8ecd6.toInt());visibility=View.GONE }
         agentStatus=label(11f).apply { gravity=Gravity.START or Gravity.CENTER_VERTICAL;setTextColor(green);setOnClickListener { host.petReconnect() } }
-        agentPane.addView(agentStatus,LinearLayout.LayoutParams(-1,dp(48)))
-        agentText=label(14f).apply { gravity=Gravity.START;setPadding(0,dp(4),0,dp(4));setTextIsSelectable(true) }
-        agentScroll=ScrollView(context).apply { addView(agentText) }
-        agentPane.addView(agentScroll,LinearLayout.LayoutParams(-1,0,1f))
-        val returnRoom=button(t("방으로 · 음성 정지","お部屋へ · 音声停止","Room · Stop voice")){ host.petStopSpeech();agentPane.visibility=View.GONE }
+        agentPane.addView(agentStatus,LinearLayout.LayoutParams(-1,dp(28)))
+        val dialogueBody=LinearLayout(context).apply { gravity=Gravity.CENTER_VERTICAL }
+        dialogueScene=PetScene(context)
+        dialogueBody.addView(dialogueScene,LinearLayout.LayoutParams(0,-1,0.38f).apply { rightMargin=dp(8) })
+        agentText=label(14f).apply { gravity=Gravity.START;setPadding(dp(3),dp(5),dp(3),dp(5));setTextIsSelectable(true) }
+        agentScroll=ScrollView(context).apply { addView(agentText);isFillViewport=true }
+        dialogueBody.addView(agentScroll,LinearLayout.LayoutParams(0,-1,0.62f))
+        agentPane.addView(dialogueBody,LinearLayout.LayoutParams(-1,0,1f))
+        val returnRoom=button(t("방으로 · 음성 정지","お部屋へ · 音声停止","Room · Stop voice")){ host.petStopSpeech();practiceLanguage=null;agentPane.visibility=View.GONE }
         agentPane.addView(returnRoom,LinearLayout.LayoutParams(-1,dp(48)))
         roomStack.addView(agentPane,FrameLayout.LayoutParams(-1,-1))
         root.addView(roomStack,LinearLayout.LayoutParams(-1,0,1f).apply { topMargin=dp(6);bottomMargin=dp(4) })
@@ -143,15 +179,38 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         }
         listOf(talk,
             button(t("글쓰기","入力","Type")){if(!inGame)host.petType()},
-            button(t("답변","返答","Reply")){if(!inGame) { host.petRefresh();showAgent() }},
-            button(t("기능","機能","Tools")){if(!inGame)host.petTools()}
+            button(t("대화 보기","会話を見る","View chat")){if(!inGame) { host.petRefresh();showAgent() }},
+            button(t("특별 활동","特別活動","Activities")){showSpecialActivities()}
         ).forEach { b -> agentBar.addView(b,LinearLayout.LayoutParams(0,dp(48),1f).apply { setMargins(dp(3),0,dp(3),0) }) }
         root.addView(agentBar,LinearLayout.LayoutParams(-1,dp(50)))
-        hint=label(10f).apply { text=t("휠 선택 · 짧게 실행 / 길게 Muse에게 말하기","ホイール選択 · 短押し決定 / 長押しで話す","Wheel selects · Tap confirms / Hold to talk") }
+        hint=label(10f).apply { text=t("길게 눌러 말하기 · 측면 버튼 + 휠: 음량","長押しで話す · サイドボタン＋ホイール：音量","Hold to talk · Side button + wheel: volume") }
         root.addView(hint,LinearLayout.LayoutParams(-1,dp(24)))
         setContentView(root);render()
     }
+    internal fun refreshReplyMute() {
+        if(!::replyMuteButton.isInitialized)return
+        val muted=host.replyMuted
+        replyMuteButton.setImageResource(if(muted)R.drawable.ic_quiet else R.drawable.ic_speaker)
+        replyMuteButton.imageTintList=android.content.res.ColorStateList.valueOf(if(muted)Color.rgb(128,124,109) else green)
+        replyMuteButton.isSelected=muted
+        replyMuteButton.contentDescription=if(muted)t("음성 OFF: 눌러서 켜기","音声 OFF: タップしてオン","Voice OFF: tap to enable")
+            else t("음성 ON: 눌러서 끄기","音声 ON: タップしてオフ","Voice ON: tap to disable")
+    }
+    internal fun showMediaVolume(volume:Int,max:Int) {
+        say("음량 $volume / $max","音量 $volume / $max","Volume $volume / $max")
+    }
     internal fun muteAudio() { if(::audio.isInitialized)audio.mute() }
+    private val activitiesStore by lazy { PetActivitiesStore(context) }
+    private val activities by lazy { PetActivities(host,::dialogueState) { room.react("heart");refreshActivities();render() } }
+    private var onTrip=false
+    private fun refreshActivities() {
+        onTrip=activitiesStore.trip(pet.seed)!=null
+        room.travelling=onTrip;dialogueScene.travelling=onTrip
+        room.decoration=activitiesStore.decoration(pet.seed);dialogueScene.decoration=room.decoration
+    }
+    private fun record(kind:String,value:String="") { activitiesStore.event(pet.seed,kind,value) }
+    internal fun showSpecialActivities() { if(!inGame && !host.petInputBusy){muteAudio();activities.show()} }
+    internal fun showPromise(id:String) { if(!inGame && !host.petInputBusy)activities.promiseDetail(id) }
     private fun showSoundSettings() {
         val labels=arrayOf(t("성장에 맞춤","成長に合わせる","Follow growth"),t("숲 속 새소리","森の鳥の声","Forest birds"),t("포근한 오르골","やさしいオルゴール","Cozy music box"),t("밤의 정원","夜の庭","Night garden"),t("BGM 끄기","BGMオフ","Music off"))
         android.app.AlertDialog.Builder(context).setTitle(t("배경음 · 효과음","BGM・効果音","Music & sounds"))
@@ -184,7 +243,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
                 b.setTextColor(if(i==selected) Color.WHITE else ink)
                 b.background=panel(if(i==selected) green else 0xffe6e3cf.toInt(),12f)
             }
-            b.isEnabled=!pet.dead && !inGame && room.hatchStarted==0L && !host.petAudioBlocked && (!pet.hatched || !pet.sleeping || i==3)
+            b.isEnabled=!onTrip && !pet.dead && !inGame && room.hatchStarted==0L && !host.petAudioBlocked && (!pet.hatched || !pet.sleeping || i==3)
             b.alpha=if(b.isEnabled)1f else 0.4f
         }
         val names=if(!pet.hatched)listOf(t("온기","温める","Warm"),t("토닥","なでる","Pat"),t("닦기","拭く","Wipe"),t("자장가","子守歌","Lullaby")) else listOf(t("먹이","ごはん","Feed"),t("놀이","遊ぶ","Play"),t("돌봄","お世話","Care"),if(pet.sleeping)t("깨우기","起こす","Wake") else t("잠자기","寝る","Sleep"))
@@ -192,6 +251,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         if(SystemClock.elapsedRealtime()>messageUntil && !inGame) {
             effect=""
             notice.showText(when {
+                onTrip->t("탐험 중 · 특별 활동에서 확인해 주세요","探検中 · 特別活動で確認してね","Exploring · Check Special activities")
                 room.hatchStarted>0L->t("톡… 톡… 뮤즈가 나오고 있어요!","ぴき…ぴき…Museが生まれるよ！","Crack… crack… Muse is hatching!")
                 pet.dead->t("뮤즈가 별이 되었어요. ↺로 새 알을 맞이할 수 있어요","Museは星になりました。↺で新しいたまごを迎えられます","Muse has become a star. Welcome a new egg with ↺.")
                 !pet.hatched->t("어떤 친구를 만나게 될까요? 천천히 함께 기다려요","どんな子に会えるかな？ゆっくり待とう","Who will we meet? Let's wait together.")
@@ -214,14 +274,16 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
             else roomWindow.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         room.pet=pet
+        dialogueScene.pet=pet
+        dialogueScene.activity=host.petConversationActivity
         room.invalidate()
     }
     private fun save() { store.save(pet);previousSave=SystemClock.elapsedRealtime() }
     private fun activate(index:Int) {
-        if(pet.dead || inGame || room.hatchStarted>0L || host.petAudioBlocked)return
+        if(onTrip || pet.dead || inGame || room.hatchStarted>0L || host.petAudioBlocked)return
         val now=System.currentTimeMillis();pet=pet.advance(now)
         if(!pet.hatched) {
-            pet=pet.care(PetAction.entries[index],now);save()
+            val before=pet;pet=pet.care(PetAction.entries[index],now);save();if(pet!=before)record("care")
             room.react(when(index){0->"heart";1->"chirp";2->"wash";else->"sleep"})
             audio.effect(when(index){2->"wash";3->"sleep";else->"chirp"})
             say("알이 기분 좋게 흔들려요!","たまごがうれしそうに揺れてる！","The egg wiggles happily!");render();return
@@ -235,7 +297,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         if(index==2){chooseCare();return}
         val before=pet
         effect=""
-        pet=pet.care(PetAction.entries[index],now);save()
+        pet=pet.care(PetAction.entries[index],now);save();if(pet!=before && pet.sleeping)record("sleep")
         when(index) {
             0->{effect="food";if(before.food>=99)say("배불러요! 조금 있다 먹어요","おなかいっぱい！またあとで","I'm full! A snack later, please.") else say("냠냠! 맛있어요","もぐもぐ！おいしいね","Yum! That was delicious.")}
             2->{effect="wash";say("보송보송, 기분 좋아요!","ぴかぴか！気持ちいいね","Fresh and clean. Thank you!")}
@@ -254,7 +316,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         val names=listOf(t("따뜻한 우유","あたたかいミルク","Warm milk"),t("포근한 죽","おかゆ","Porridge"),t("숲속 베리","森のベリー","Forest berries"),t("구운 생선","焼き魚","Grilled fish"),t("채소 한 접시","野菜プレート","Vegetable plate"),t("작은 케이크 · 가끔만","小さなケーキ · たまにね","Small cake · an occasional treat"))
         choices(t("오늘은 무엇을 먹을까요?","今日は何を食べよう？","What's on the menu?"),names){i->
             val now=System.currentTimeMillis();val before=pet.advance(now);pet=before.feed(PetFood.entries[i],now);save()
-            if(pet.fedAt!=before.fedAt){room.react("food");audio.effect("feed");say("냠냠… 함께 먹으니 좋아요","もぐもぐ…いっしょでうれしい","Yum… it's nice to eat together.")}
+            if(pet.fedAt!=before.fedAt){record("food");room.react("food");audio.effect("feed");say("냠냠… 함께 먹으니 좋아요","もぐもぐ…いっしょでうれしい","Yum… it's nice to eat together.")}
             else say("아직 배불러요. 조금 있다 먹어요","まだおなかいっぱい。またあとで","Still full. Let's eat a little later.")
             render()
         }
@@ -263,7 +325,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         choices(t("돌봐 주기","お世話","Care"),listOf(t("따뜻한 목욕","あたたかいお風呂","Warm bath"),t("아플 때 약 주기","具合が悪い時のお薬","Medicine when ill"))){i->
             val now=System.currentTimeMillis();val before=pet.advance(now)
             pet=if(i==0)before.care(PetAction.CLEAN,now)else before.medicine(now);save()
-            if(pet!=before){room.react("wash");audio.effect("wash");say("고마워요. 조금 편안해졌어요","ありがとう。少し楽になったよ","Thank you. That feels better.")}
+            if(pet!=before){record("care");room.react("wash");audio.effect("wash");say("고마워요. 조금 편안해졌어요","ありがとう。少し楽になったよ","Thank you. That feels better.")}
             else say("지금은 괜찮아요. 곁에 있어 주세요","今は大丈夫。そばにいてね","I'm okay for now. Stay with me.")
             render()
         }
@@ -315,10 +377,10 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     }
     private fun finishGame(won:Boolean,completed:Boolean=true) {
         gameEnds=0;playRow.visibility=View.GONE
-        if(completed){pet=pet.play(game,won,System.currentTimeMillis());save();audio.effect(if(won)"win" else "chirp");room.react("heart")}
+        if(completed){record("play");pet=pet.play(game,won,System.currentTimeMillis());save();audio.effect(if(won)"win" else "chirp");room.react("heart")}
         if(won)say("해냈어요! 같이 놀아서 즐거워요","できた！いっしょで楽しいね","We did it! That was fun together.")
         else say("함께 연습해요. 이기지 않아도 괜찮아요","いっしょに練習しよう。勝てなくても大丈夫","Let's practise together. It's okay not to win.")
-        hint.text=t("휠 선택 · 짧게 실행 / 길게 Muse에게 말하기","ホイール選択 · 短押し決定 / 長押しで話す","Wheel selects · Tap confirms / Hold to talk")
+        hint.text=t("길게 눌러 말하기 · 측면 버튼 + 휠: 음량","長押しで話す · サイドボタン＋ホイール：音量","Hold to talk · Side button + wheel: volume")
         render()
     }
     private val tick=object:Runnable { override fun run() {
@@ -331,7 +393,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         if(visible && pet.hatchReady) {
             if(room.hatchStarted==0L) { room.hatchStarted=elapsed;messageUntil=0L }
             if(!ValueAnimator.areAnimatorsEnabled() || elapsed-room.hatchStarted>=2600L) {
-                pet=pet.hatch(System.currentTimeMillis());room.hatchStarted=0L;room.react("hatch");audio.effect("level");save()
+                pet=pet.hatch(System.currentTimeMillis());record("hatch");room.hatchStarted=0L;room.react("hatch");audio.effect("level");save()
                 say("안녕! 아기 뮤즈가 태어났어요","こんにちは！ベビーMuseが生まれたよ","Hello! Baby Muse has hatched.")
             }
         }
@@ -344,15 +406,16 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         super.onStart();foreground=this;pet=store.load(System.currentTimeMillis());previousTick=0L;handler.post(tick)
         roomWindow.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT)
         roomWindow.decorView.post { if(isShowing)roomWindow.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT) }
-        host.petRefresh()
+        activitiesStore.welcome(pet.seed);refreshActivities();host.petRefresh()
     }
     override fun onStop() {
         if(foreground===this)foreground=null
+        activities.close()
         cancelAgentInput();handler.removeCallbacksAndMessages(null)
         if(inGame)finishGame(false,false)
         pet=pet.advance(System.currentTimeMillis());save();audio.close();super.onStop()
     }
-    override fun onWindowFocusChanged(hasFocus:Boolean) { super.onWindowFocusChanged(hasFocus);if(!hasFocus){cancelAgentInput();muteAudio();if(::room.isInitialized)room.hatchStarted=0L;previousTick=0L} }
+    override fun onWindowFocusChanged(hasFocus:Boolean) { super.onWindowFocusChanged(hasFocus);if(hasFocus)refreshReplyMute();if(!hasFocus){cancelAgentInput();muteAudio();if(::room.isInitialized)room.hatchStarted=0L;previousTick=0L} }
     @Deprecated("Legacy Android back handling")
     override fun onBackPressed() { if(inGame)finishGame(false,false) else if(agentPane.visibility==View.VISIBLE)agentPane.visibility=View.GONE else super.onBackPressed() }
     private fun move(delta:Int) {
@@ -361,24 +424,45 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         if(inGame) { selectedTile=(selectedTile+delta+3)%3;updateGame() }
         else { selected=if(pet.hatched && pet.sleeping)3 else (selected+delta+4)%4;render() }
     }
+    private fun wheel(delta:Int) {
+        if(sideGesture.canAdjustVolume && hasWindowFocus()) {
+            handler.removeCallbacks(voiceHold)
+            sideGesture.wheel()
+            endVoice(false) // Discard any pending recording; release must not send or activate care.
+            host.adjustMediaVolume(-delta)
+        } else move(delta)
+    }
     internal fun petKey(event:KeyEvent):Boolean {
         when(event.keyCode) {
             KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if(event.action==KeyEvent.ACTION_DOWN)move(if(event.keyCode==KeyEvent.KEYCODE_DPAD_UP)-1 else 1)
+                if(event.action==KeyEvent.ACTION_DOWN)wheel(if(event.keyCode==KeyEvent.KEYCODE_DPAD_UP)-1 else 1)
                 return true
             }
-            KeyEvent.KEYCODE_PAIRING,KeyEvent.KEYCODE_DPAD_CENTER,KeyEvent.KEYCODE_ENTER -> {
-                if(event.action==KeyEvent.ACTION_DOWN && event.repeatCount==0) {
-                    press=event.downTime;held=false
-                    if(event.keyCode==KeyEvent.KEYCODE_PAIRING && !inGame) handler.postDelayed(voiceHold,SideButtonGesture.HOLD_MS)
-                }
-                if(event.action==KeyEvent.ACTION_UP) {
+            KeyEvent.KEYCODE_PAIRING -> {
+                if(event.action==KeyEvent.ACTION_DOWN && event.repeatCount==0 && hasWindowFocus()) {
+                    if(sideGesture.downTime==event.downTime)return true
                     handler.removeCallbacks(voiceHold)
-                    if(press==event.downTime) {
-                        if(held)endVoice(!event.isCanceled)
-                        else if(!event.isCanceled) { if(inGame)catchStar() else if(agentPane.visibility!=View.VISIBLE)activate(selected) }
+                    endVoice(false)
+                    sideGesture.down(event.downTime,true)
+                    if(!inGame)handler.postDelayed(voiceHold,SideButtonGesture.HOLD_MS)
+                }
+                if(event.action==KeyEvent.ACTION_UP && sideGesture.downTime==event.downTime) {
+                    handler.removeCallbacks(voiceHold)
+                    when(sideGesture.up(event.downTime,event.eventTime,event.isCanceled)) {
+                        SideButtonGesture.Action.FINISH -> endVoice(true)
+                        SideButtonGesture.Action.CANCEL -> endVoice(false)
+                        SideButtonGesture.Action.LOCK -> if(inGame)catchStar() else if(agentPane.visibility!=View.VISIBLE)activate(selected)
+                        else -> Unit
                     }
+                }
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER,KeyEvent.KEYCODE_ENTER -> {
+                if(sideGesture.downTime!=null || held)return true
+                if(event.action==KeyEvent.ACTION_DOWN && event.repeatCount==0)press=event.downTime
+                if(event.action==KeyEvent.ACTION_UP && press==event.downTime) {
                     press=-1
+                    if(!event.isCanceled) { if(inGame)catchStar() else if(agentPane.visibility!=View.VISIBLE)activate(selected) }
                 }
                 return true
             }
@@ -389,7 +473,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     override fun dispatchGenericMotionEvent(event:MotionEvent):Boolean {
         if(event.action==MotionEvent.ACTION_SCROLL) {
             val delta=event.getAxisValue(MotionEvent.AXIS_SCROLL).takeIf { it!=0f } ?: event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-            if(delta!=0f){move(if(delta>0)-1 else 1);return true}
+            if(delta!=0f){wheel(if(delta>0)-1 else 1);return true}
         }
         return super.dispatchGenericMotionEvent(event)
     }
@@ -400,7 +484,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
             .setNegativeButton(t("취소","キャンセル","Cancel"),null)
             .setPositiveButton(t("새 알 맞이하기","たまごを迎える","Welcome an egg")){_,_->
                 pet=store.startNewEgg(System.currentTimeMillis());room.hatchStarted=0;previousTick=0;selected=0;messageUntil=0;effect=""
-                agentPane.visibility=View.GONE;render()
+                activitiesStore.welcome(pet.seed);PetPromises.restore(context);refreshActivities();agentPane.visibility=View.GONE;render()
             }.show()
     }
     companion object { internal var foreground:PetRoom?=null;private set }

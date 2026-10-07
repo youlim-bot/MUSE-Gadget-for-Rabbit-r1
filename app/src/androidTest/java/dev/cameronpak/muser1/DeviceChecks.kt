@@ -35,6 +35,9 @@ import kotlin.math.sin
 
 /** Local hardware checks. No Muse network calls or account credentials are fabricated. */
 class DeviceChecks : Instrumentation() {
+    private var petActivities=false
+    private var petDialogue=false
+    private var petControls=false
     private var petDemo=false
     private var petLifecycle=false
     private var connectionRecovery=false
@@ -47,6 +50,7 @@ class DeviceChecks : Instrumentation() {
     private var localClock = false
     private var cloud = false
     private var voice = false
+    private var avatarEffects = false
     private var visual = false
     private var buttonCheck = false
     private var buttonRecording = false
@@ -58,6 +62,9 @@ class DeviceChecks : Instrumentation() {
     private var expectedTranscript = "Please say the words Muse on Rabbit is working and nothing else."
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        petActivities=arguments?.getString("petActivities")=="true"
+        petDialogue=arguments?.getString("petDialogue")=="true"
+        petControls=arguments?.getString("petControls")=="true"
         petDemo=arguments?.getString("petDemo")=="true"
         petLifecycle=arguments?.getString("petLifecycle")=="true" || petDemo
         connectionRecovery=arguments?.getString("connectionRecovery")=="true"
@@ -70,7 +77,8 @@ class DeviceChecks : Instrumentation() {
         localClock = arguments?.getString("localClock") == "true"
         cloud = arguments?.getString("cloud") == "true"
         voice = arguments?.getString("voice") == "true"
-        visual = arguments?.getString("visual") == "true"
+        avatarEffects = arguments?.getString("avatarEffects") == "true"
+        visual = arguments?.getString("visual") == "true" || avatarEffects
         buttonCheck = arguments?.getString("button") == "true"
         buttonRecording = arguments?.getString("buttonRecording") == "true"
         volumeFast = arguments?.getString("volumeFast") == "true"
@@ -84,6 +92,9 @@ class DeviceChecks : Instrumentation() {
     override fun onStart() {
         val result = Bundle()
         try {
+            if(petActivities) { PetActivitiesCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
+            if(petDialogue) { PetDialogueCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
+            if(petControls) { PetControlsCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if(petLifecycle) { PetLifecycleCheck.run(this,result,petDemo);finish(Activity.RESULT_OK,result);return }
             if(connectionRecovery) { ConnectionRecoveryCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if (additions || reminderUi) { AdditionsCheck.run(this,result,reminderUi);finish(Activity.RESULT_OK,result);return }
@@ -137,7 +148,7 @@ class DeviceChecks : Instrumentation() {
             result.putString("stream", "PASS: side-button service hold starts recording; nonzero 16kHz PCM captured; WAV lengths match; audio playback completed. No audio sent to Muse.")
             finish(Activity.RESULT_OK, result)
         } catch (error: Exception) {
-            val detail = if (petLifecycle || reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
+            val detail = if (petActivities || petControls || petLifecycle || reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
             result.putString("stream", result.getString("stream", "") + "FAIL: " + error.javaClass.simpleName + detail)
             finish(Activity.RESULT_CANCELED, result)
         }
@@ -845,6 +856,18 @@ class DeviceChecks : Instrumentation() {
                 }
             }
         }
+        if (avatarEffects) {
+            check(!File(targetContext.noBackupFilesDir,"credentials.enc").exists())
+            runOnMainSync {
+                screen.showConversation("안녕!", "반가워요. 무엇을 도와드릴까요?")
+                screen.setState("MUSE IS SPEAKING")
+            }
+            capture("ui-avatar-speaking").recycle()
+            runOnMainSync { screen.setState("READY");screen.setCharging(true) }
+            capture("ui-avatar-charging").recycle()
+            result.putString("stream","PASS: Offline native avatar effects captured. No microphone or Muse turn.")
+            return
+        }
         fun checkIconAnimation(first: Bitmap, second: Bitmap) {
             val position = IntArray(2)
             var top = 0
@@ -910,6 +933,9 @@ class DeviceChecks : Instrumentation() {
         capture("ui-speaking").recycle()
         runOnMainSync { screen.setState("READY") }
         val reply = capture("ui-reply")
+        runOnMainSync { screen.setCharging(true) }
+        capture("ui-charging-reply").recycle()
+        runOnMainSync { screen.setCharging(false) }
         val comparison = Bitmap.createBitmap(960, 640, Bitmap.Config.ARGB_8888)
         Canvas(comparison).apply {
             // Explicit pixel rectangles prevent Android's density scaling from distorting screenshots.

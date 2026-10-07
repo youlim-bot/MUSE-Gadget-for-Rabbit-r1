@@ -599,6 +599,7 @@ internal class MuseScreen(
         private val image = RectF()
         private val source = Rect()
         private val portraitClip = Path()
+        private val lightning = Path()
         private var glow: RadialGradient? = null
 
         override fun performClick(): Boolean {
@@ -659,16 +660,33 @@ internal class MuseScreen(
             canvas.restore()
             if (phase == Phase.SPEAKING) {
                 paint.color = orange
+                // Keep the larger effect inside even the compact conversation portrait.
+                val barWidth = dp(5).toFloat()
+                val spacing = dp(9).toFloat()
+                val groupWidth = spacing * 2 + barWidth
+                val left = min(width * .79f, width - groupWidth - dp(3))
                 repeat(3) { index ->
-                    val bar = dp(5) + (dp(9) * ((sin(clock * 7 + index * 1.8) + 1) / 2)).toFloat()
-                    val x = width * .80f + index * dp(5)
-                    canvas.drawRoundRect(x, height / 2f - bar / 2, x + dp(3), height / 2f + bar / 2,
-                        dp(2).toFloat(), dp(2).toFloat(), paint)
+                    val bar = dp(10) + (dp(16) * ((sin(clock * 7 + index * 1.8) + 1) / 2)).toFloat()
+                    val x = left + index * spacing
+                    canvas.drawRoundRect(x, height / 2f - bar / 2, x + barWidth, height / 2f + bar / 2,
+                        barWidth / 2, barWidth / 2, paint)
                 }
             }
             if(animate && charging && phase==Phase.QUIET){
-                paint.color=orange;paint.alpha=(110+pulse*100).toInt();paint.textSize=dp(13).toFloat()
-                canvas.drawText("ϟ",width*.82f,height*.30f,paint);paint.alpha=255
+                paint.color=orange;paint.alpha=(180+pulse*75).toInt()
+                val boltHeight = min(dp(26).toFloat(), height * .30f)
+                val boltWidth = boltHeight * .62f
+                val left = min(width * .79f, width - boltWidth - dp(3))
+                val top = height * .20f
+                lightning.rewind()
+                lightning.moveTo(left + boltWidth * .60f, top)
+                lightning.lineTo(left, top + boltHeight * .58f)
+                lightning.lineTo(left + boltWidth * .43f, top + boltHeight * .58f)
+                lightning.lineTo(left + boltWidth * .28f, top + boltHeight)
+                lightning.lineTo(left + boltWidth, top + boltHeight * .37f)
+                lightning.lineTo(left + boltWidth * .55f, top + boltHeight * .37f)
+                lightning.close()
+                canvas.drawPath(lightning,paint);paint.alpha=255
             }
             if (isShown && windowVisibility == View.VISIBLE && (phase != Phase.QUIET || animate)) postInvalidateDelayed(33)
         }

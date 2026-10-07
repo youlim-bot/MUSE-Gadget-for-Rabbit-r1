@@ -237,3 +237,19 @@ The V2.0 gallery uses the custom dolphin and fictional offline examples. Sample 
 Validation: normal/demo builds and 94 unit tests passed. Development-device checks covered mode menus, target switching, language/scenario selection and an actual 10-second clock transition; the device was returned to its original 20-second setting. Live photo judging and conversation quality were not exercised for this update. The V1.5 release tag and its screenshot kit are unchanged; these additions are on the main branch.
 
 Main-screen status now shows the active Wi-Fi/mobile connection and signal bars beside the battery. LTE, 5G, 3G and 2G labels follow the available radio information; unknown information is not displayed as a full signal. An exclamation mark indicates that internet access is not validated. VPN and Ethernet are identified separately. Updates run only while the main activity is foreground; no SSID, phone number or SIM identifier is stored. Development-device verification confirmed LTE signal 4/4 and validated internet; live Wi-Fi switching was not tested in this update. The offline demo uses a fictional fixed signal. Activity banners now use a content-sized height and dedicated padding to prevent clipped text.
+
+
+## Latest source: pet special activities
+
+Open **Raise Muse → Activities** to explore, read the diary, save memories,
+decorate the room, complete camera missions or make daily promises. Solo trips
+require a hatched, healthy, awake companion and continue while the app is closed;
+needs still decay. Room decorations come from trips and verified missions.
+Photo missions require Muse connectivity and reviewed sending; rewards are limited
+to once per local day. Daily promises notify on the R1; battery saving may delay
+notifications. Starting a promise opens a reviewable composer without automatically
+sending. Korean/Japanese/English practice stays in the pet room.
+
+Existing care data, pairing and shared mute settings are retained.
+See [detailed behaviour](../special-activities.md). These changes are in the
+latest source; the existing V2.0 release APK has not been replaced.

@@ -10,6 +10,10 @@ import kotlin.math.*
 /** Custom Muse-generated dolphin with a deforming body, blink poses, movement and procedural egg animation. */
 internal class PetScene(context:Context):View(context) {
     var pet=PetState(updatedAt=0); set(value){field=value;invalidate()}
+    var decoration=-1; set(value){if(field!=value){field=value;invalidate()}}
+    var travelling=false; set(value){if(field!=value){field=value;invalidate()}}
+    var activity=""; set(value){if(field!=value){field=value;invalidate()}}
+    internal var lastExpression=""; private set
     var hatchStarted=0L
     private var reaction=""
     private var reactionStarted=0L
@@ -18,7 +22,7 @@ internal class PetScene(context:Context):View(context) {
     private val avatar=BitmapFactory.decodeResource(resources,R.drawable.muse_dolphin)
     private val vertices=FloatArray(13*13*2)
     private val shape=Path()
-    fun react(name:String){reaction=name;reactionStarted=SystemClock.elapsedRealtime();invalidate()}
+    fun react(name:String){reaction=name;lastExpression=name;reactionStarted=SystemClock.elapsedRealtime();invalidate()}
     init { importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES }
     private fun rect(c:Canvas,l:Float,t:Float,r:Float,b:Float,color:Int,radius:Float=0f) { brush.color=color;brush.style=Paint.Style.FILL;c.drawRoundRect(l,t,r,b,radius,radius,brush) }
     private fun text(c:Canvas,value:String,x:Float,y:Float,size:Float,color:Int) { brush.color=color;brush.textSize=size;brush.typeface=Typeface.create("sans-serif",Typeface.BOLD);brush.textAlign=Paint.Align.CENTER;c.drawText(value,x,y,brush) }
@@ -28,7 +32,7 @@ internal class PetScene(context:Context):View(context) {
         val ms=previewTime?:SystemClock.elapsedRealtime();val t=ms/1000.0
         val animated=ValueAnimator.areAnimatorsEnabled()
         val age=(ms-reactionStarted).coerceAtLeast(0)
-        val effect=if(age<2800)reaction else ""
+        val effect=if(age<PetMotion.duration(reaction))reaction else activity
         val scale=width/360f;val rh=height/scale
         c.save();c.scale(scale,scale)
         val night=pet.hatched && pet.sleeping
@@ -44,8 +48,27 @@ internal class PetScene(context:Context):View(context) {
         c.save();c.rotate(if(animated)sin(t*1.7).toFloat()*4 else 0f,295f,53f)
         brush.color=0xff6e9161.toInt();c.drawOval(274f,21f,296f,40f,brush);c.drawOval(295f,16f,318f,38f,brush);c.restore()
         brush.color=if(night)0xff656677.toInt() else 0xffe4cfab.toInt();c.drawOval(65f,rh*.76f,295f,rh*.97f,brush)
+        if(decoration>=0) {
+            c.save();c.translate(-100f,maxOf(60f,minOf(80f,rh*.35f)))
+            rect(c,112f,22f,172f,65f,0xfff4edcf.toInt(),8f)
+            when(decoration) {
+                0->{brush.color=0xff73955c.toInt();c.drawOval(125f,31f,150f,45f,brush);c.drawOval(142f,40f,161f,57f,brush)}
+                1->{brush.color=0xffcf9e95.toInt();c.drawArc(123f,30f,163f,67f,185f,170f,true,brush);text(c,"|||",143f,50f,16f,0xfff4dfd5.toInt())}
+                2->text(c,"★",143f,56f,32f,0xffc89e45.toInt())
+                3->{rect(c,133f,45f,153f,59f,0xffbc7959.toInt(),3f);brush.color=0xff70925e.toInt();c.drawOval(123f,28f,143f,44f,brush);c.drawOval(141f,27f,160f,43f,brush)}
+                4->{brush.style=Paint.Style.STROKE;brush.strokeWidth=5f;listOf(0xffd99388.toInt(),0xffe5bf66.toInt(),0xff7eac9a.toInt()).forEachIndexed { i,color->brush.color=color;c.drawArc(122f+i*5,28f+i*5,164f-i*5,74f-i*5,190f,160f,false,brush) };brush.style=Paint.Style.FILL}
+                5->text(c,"☾",143f,56f,32f,0xff9d94b8.toInt())
+            }
+            rect(c,108f,65f,176f,70f,0xff8e9978.toInt(),3f)
+            c.restore()
+        }
         val hatch=if(hatchStarted>0L)((ms-hatchStarted)/2600f).coerceIn(0f,1f) else 0f
-        if(pet.dead) {
+        if(travelling && !pet.dead) {
+            rect(c,130f,rh*.40f,230f,rh*.72f,0xffb99365.toInt(),10f)
+            text(c,"…",180f,rh*.61f,36f,0xfff8edd7.toInt())
+            text(c,"›  ›  ›",180f,rh*.87f,28f,0xff6a8261.toInt())
+        }
+        else if(pet.dead) {
             brush.color=0xfff4e3b7.toInt();c.drawCircle(180f,rh*.46f,42f,brush)
             brush.alpha=170;c.drawBitmap(avatar,null,RectF(148f,rh*.46f-32f,212f,rh*.46f+32f),brush);brush.alpha=255
             text(c,"✦",180f,rh*.46f-48f,28f,0xffb99b59.toInt())
@@ -72,6 +95,12 @@ internal class PetScene(context:Context):View(context) {
                 "food"->{ text(c,"●",239f,rh*.64f-sin(age/110.0).toFloat()*4,22f,0xffd18a42.toInt());text(c,"· ·",255f,rh*.51f,20f,0xffa97a44.toInt()) }
                 "wash"->{ brush.color=0xffecfaf5.toInt();repeat(7){i->c.drawCircle(98f+i*26,rh*.55f+(i%3)*18-drift,5f+(i%2)*3,brush)} }
                 "heart","level","chirp","hatch"->text(c,if(effect=="level")"✦" else "♥",257f,rh*.5f-drift,25f,0xffcc817d.toInt())
+                "dance"->text(c,"♪ ♫",257f,rh*.43f-drift,30f,0xff879a74.toInt())
+                "wave"->text(c,"✦",265f,rh*.45f-drift,28f,0xffc48b53.toInt())
+                "cheer","jump"->text(c,"★",257f,rh*.43f-drift,30f,0xffc48b53.toInt())
+                "think","thinking"->text(c,"…",255f,rh*.43f,30f,0xff6c8496.toInt())
+                "listening"->text(c,"♪",255f,rh*.43f,27f,0xff6c8496.toInt())
+                "speaking"->text(c,"· · ·",255f,rh*.43f,27f,0xff6c8496.toInt())
                 "sleep"->if(!pet.hatched)text(c,"♪",249f,rh*.50f-drift,25f,0xff879a74.toInt())
             }
         }

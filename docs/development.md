@@ -121,3 +121,132 @@ After building and installing the separate demo APK on an authorized r1, run `py
 ## Post-V1.5 source update
 
 Normal/demo builds and 94 JVM tests pass for the reactive avatar, treasure hunt, conversation partner and configurable clock delay additions. Native menu checks and a 10-second clock transition were performed on the private development build. No live photo judgment or Muse practice response was requested during these checks. Existing V1.5 screenshot fixtures remain unchanged.
+
+### Pet reply mute and volume verification (2026-10-07)
+
+Debug and Android test APK builds passed, with all 116 JVM tests passing in
+both working copies. The offline `petControls` instrumentation fixture passed
+on a disposable emulator: shared/persisted reply mute, localized View chat
+control, DPAD and generic rotary volume routing, cancellation, and mini-game
+selection isolation. It made no microphone or live Muse requests.
+
+Installed on the R1 with `adb install -r`; pre-launch hashes confirmed preserved
+credentials, conversation history, saved library, pet records, and reply options.
+The actual R1 pet toolbar and mute toggle were inspected, and the original mute
+setting was restored after checking. Side button controls was initially off and
+was enabled after the owner explicitly approved it. Automated physical-device
+volume assertions were inconsistent; a subsequent injected up combination did
+increase media volume. The owner then confirmed on the physical R1 that
+holding the side button while turning the wheel changes both the on-screen
+volume number and audible volume normally.
+
+Physical R1 follow-up: after the owner paired again on the access-first build,
+one app restart completed account HTTP 200, WebSocket HTTP 101, the Noise
+handshake, and ready without refreshing or modifying encrypted credentials.
+The side-button accessibility service remained bound after restoration. This
+confirms the tested restart; long-term token expiry has not been exercised.
+
+
+### Pet dialogue and expressions (2026-10-07, local)
+
+Both source trees build and pass 129 JVM tests (8 new pet dialogue checks).
+The unpaired emulator `petDialogue` fixture passed with `INSTRUMENTATION_CODE: -1`:
+partial structured replies remain hidden, final replies normalize to text, one
+expression runs per turn, mute and care state remain intact, stale dialog replies
+cannot animate a replacement dialog, and KO/JA/EN show avatar and text without
+overlap at 480×640. Native captures at two dance times differ and were inspected.
+This uses fictional responses, not live model compliance or physical R1 proof.
+
+Lint reports 20 errors in unchanged pairing/recorder permission handling, camera
+API compatibility and vendored Java indentation; no errors in the pet dialogue
+changes. Device installation and live voice/Muse behavior remain unverified for
+this change. No publication was performed.
+
+The existing `petControls` regression also passed (mute persistence, side-button
+plus DPAD/generic wheel volume, cancellation and mini-game isolation). Its first
+run checked volume before Android AudioService applied the fixture's initial
+volume; another run lacked dialog input focus. The fixture now waits for
+both explicit preconditions with bounded polls and passed on rerun. Production volume behavior was not changed.
+
+
+### Pet dialogue R1 deployment (2026-10-07)
+
+After the owner's explicit build/deploy request, the latest debug APK built and
+all 129 JVM tests passed. The USB target was verified as vendor model r1 on
+mt6765. The installed and replacement signing certificates matched. Installation
+used `adb install -r`; the installed APK hash matches the built APK.
+
+The Home app automatically restarted after replacement, updating its connection
+diagnostics. Excluding only that runtime diagnostic file, a repeated comparison
+verified all 20 private data/preference files unchanged across installation.
+Encrypted pairing credentials remained unchanged after launch. Account HTTP 200,
+WebSocket HTTP 101, Noise handshake and ready were recorded; MainActivity was
+resumed. The exact prior accessibility setting was restored and Side button
+controls was bound. No app-data clearing, uninstall, firmware changes or device
+reboot occurred. No microphone recording or live user question was submitted;
+actual model expression selection and audible playback remain hands-on checks.
+No GitHub commit, push or public release was performed.
+
+
+### Pet tools deployment (2026-10-07)
+
+Both source builds and their 129 JVM tests passed. The verified APK was installed
+on the connected R1 with matching signing certificate and installed APK hash.
+Twenty user data/preference files remained unchanged across update (runtime
+connection diagnostics excluded); saved credentials survived launch, Muse
+reached ready, and the side-button service was bound with its setting preserved.
+
+The actual R1 egg-stage Tools menu was opened and inspected: egg care, avatar
+questions/requests, music/effects, voice-reply toggle and care help appeared,
+with no general alarm, camera or library actions. The menu fits the 480x640
+screen. No care action or live assistant question was submitted. Adult/sleep
+menu branches were source-reviewed, not exercised on the owner's saved pet.
+No GitHub publication was performed.
+
+
+### Six special activities (2026-10-07)
+
+See [special-activities.md](special-activities.md) for behaviour and data boundaries.
+Private and public-mirror APK builds passed, with 137 JVM tests in each. On a
+disposable unpaired 480x640 emulator, special-activity persistence/rewards/photo
+reply validation/local notifications, KO/JA/EN pages and time-picker confirmation
+passed. Existing pet mute/wheel-volume and dialogue/animation regression fixtures
+also passed. No live cloud requests or microphone recordings were used.
+
+The first emulator UI checks exposed cached Pixel display/cutout overrides;
+removing those and refreshing display dimensions produced the native R1 viewport.
+Visual inspection then found low-contrast time digits and an occluded shelf
+decoration; both were corrected before the final screenshots and deployment.
+
+Lint retains the previous 20 errors (pairing/recording permissions, camera API
+compatibility and vendored code). New special-activity files have no lint errors;
+three synchronous-prefs warnings reflect deliberate atomic reward persistence.
+Lint is not clean.
+
+Installed the signed APK on the connected Rabbit r1 via an in-place update. The
+installed APK hash matched the build, and all 20 protected existing private data
+files remained unchanged across installation (runtime connection diagnostics
+excluded). Credentials also remained unchanged after launch. Muse reached ready
+after HTTP 200, WebSocket 101 and Noise handshake; the original side-button
+accessibility setting and bound service were verified.
+
+Actual R1 inspection verified all six menu entries, the existing egg state and
+hatched-only departure guard, and visible hour/minute and confirmation controls.
+No promise was scheduled on the owner's device; no photo, microphone, care action
+or live assistant question was submitted. Live photo-model accuracy and a real
+time-elapsed reminder remain hands-on checks. No commit or push was performed.
+
+
+### Source publication checks (2026-10-07)
+
+The public source normal/debug APK, isolated demo APK and Android test APK build
+passed, with 137 JVM tests. The public unpaired-emulator special-activities
+fixture passed again, including a new regression: after a photo mission, starting
+an ordinary text/voice turn clears its verifier so the next answer remains a
+normal conversation. This source correction was not installed on the owner's R1
+as part of the publication request.
+
+The staged tree passed targeted artifact/secret/private-path/contact checks and
+local documentation-link checks. Existing custom public avatar art and demo
+separation were retained. This is a source commit; the V2.0 release binaries and
+showcase assets were not republished.

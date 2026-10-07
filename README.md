@@ -49,6 +49,19 @@ An animated egg becomes a companion over days. Feed, play, care and talk togethe
 
 Alarms, timers, appointment reminders, speech-following scroll and the weather desk clock remain included from [V1.5](docs/RELEASE-V1.5.md). Navigation remains removed.
 
+## Latest source updates
+
+Pet mode now includes **Special activities**: solo expeditions, a daily diary,
+a memory chest, earned room decorations, photo missions and daily R1 promises.
+It also has state-aware Muse replies and animations, shared reply mute and
+side-button + wheel volume. Conversation avatar effects are larger, and startup
+checks the existing access token before requesting a refresh.
+
+[Special activities and usage limits](docs/special-activities.md) ·
+[Validation details](docs/development.md#six-special-activities-2026-10-07).
+These are source updates after the existing V2.0 release; the release APK and
+showcase images have not been replaced by this commit.
+
 ## Features
 
 - **Local r1 alarms and timers:** in-Muse controls, multilingual command confirmation, weekday alarms, timer presets, pause/resume and snooze. Scheduling stays on r1; initial Android permissions are required.
