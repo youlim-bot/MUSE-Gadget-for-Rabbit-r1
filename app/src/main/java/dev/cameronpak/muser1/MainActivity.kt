@@ -239,6 +239,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        petCameraOrigin=savedInstanceState?.getBundle("pet_camera_origin")
+        petCameraReturned=savedInstanceState?.getBoolean("pet_camera_returned",false)?:false
         if (BuildConfig.DEMO) UiText.set(this, DisplayLanguage.entries.firstOrNull { it.name == intent.getStringExtra("demo_language") } ?: DisplayLanguage.EN)
         volumeControlStream = AudioManager.STREAM_MUSIC
         screen = MuseScreen(this, ::beginRecording, ::finishRecording, ::showControls, ::confirmClearHistory)
@@ -496,11 +498,48 @@ class MainActivity : Activity() {
         val current=history.lastOrNull { !it.user.isNullOrBlank() && it.replies.values.any { reply->reply.isNotBlank() } }?:return null
         return (current.user.orEmpty()+"\n\n"+current.replies.values.joinToString("\n")).take(1200)
     }
+    private var petCameraOrigin:Bundle?=null
+    private var petCameraReturned=false
+    private val petCameraRequest=421
     internal fun petMissionCamera(seed:Long,token:String,target:Int) {
         if(!connected || sending || recording){android.widget.Toast.makeText(this,funText("Muse 연결 후 시도해 주세요","Museに接続してから試してね","Connect to Muse first"),android.widget.Toast.LENGTH_LONG).show();return}
+        launchPetMissionCamera(seed,token,target)
+    }
+    @Suppress("DEPRECATION")
+    private fun launchPetMissionCamera(seed:Long,token:String,target:Int) {
+        petCameraOrigin=Bundle().apply { putLong("seed",seed);putString("token",token) }
+        petCameraReturned=false
         val lang=when(UiText.language(this)){DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH;else->InputLanguage.KOREAN}
-        startActivity(Intent(this,CameraActivity::class.java).putExtra("hunt_prompt",PetActivityText.target(this,target))
-            .putExtra("hunt_language",lang.name).putExtra("pet_seed",seed).putExtra("pet_mission_token",token).putExtra("pet_mission_target",target))
+        try {
+            startActivityForResult(Intent(this,CameraActivity::class.java).putExtra("hunt_prompt",PetActivityText.target(this,target))
+                .putExtra("hunt_language",lang.name).putExtra("pet_seed",seed).putExtra("pet_mission_token",token).putExtra("pet_mission_target",target),petCameraRequest)
+        } catch(error:RuntimeException) { petCameraOrigin=null;throw error }
+    }
+    @Deprecated("Activity result callback for the in-app mission camera")
+    override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?) {
+        super.onActivityResult(requestCode,resultCode,data)
+        if(requestCode==petCameraRequest && petCameraOrigin!=null)petCameraReturned=true
+    }
+    override fun onSaveInstanceState(state:Bundle) {
+        state.putBundle("pet_camera_origin",petCameraOrigin)
+        state.putBoolean("pet_camera_returned",petCameraReturned)
+        super.onSaveInstanceState(state)
+    }
+    private fun restorePetCamera() {
+        if(!petCameraReturned)return
+        val origin=petCameraOrigin?:run {petCameraReturned=false;return}
+        val seed=origin.getLong("seed")
+        if(PetStore(this).load(System.currentTimeMillis()).seed!=seed) {
+            if(PhotoQuestion.pending?.let {it.petSeed==seed && it.petMissionToken==origin.getString("token")}==true)PhotoQuestion.pending=null
+            petCameraOrigin=null;petCameraReturned=false;return
+        }
+        showPetRoom()
+        val room=petRoom?.takeIf {it.isShowing}?:return
+        petCameraOrigin=null;petCameraReturned=false
+        val photo=PhotoQuestion.pending
+        if(photo!=null && photo.petSeed==seed && photo.petMissionToken==origin.getString("token")) {
+            room.agentUpdate(funText("미션 사진 · 연결을 기다리고 있어요","ミッション写真 · 接続を待っています","Mission photo · Waiting for connection"),"",reveal=true)
+        } else room.showMission()
     }
     private var missionPhoto:PhotoQuestion.Request?=null
     private var missionConversation:ConversationTurn?=null
@@ -982,6 +1021,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         foreground = this
+        restorePetCamera()
         if (BuildConfig.DEMO) { networkStatus.showDemo(); showOfflineDemo(); return }
         networkStatus.start()
         if(!networkWatching) {
@@ -1390,6 +1430,8 @@ class MainActivity : Activity() {
     }
 
     private fun sendPendingPhoto() {
+        if(foreground===this)restorePetCamera()
+        if(petCameraReturned)return
         if (!connected || !historyLoaded || sending || recording || foreground !== this) return
         val request = PhotoQuestion.pending ?: return
         PhotoQuestion.pending = null

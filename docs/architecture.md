@@ -107,3 +107,15 @@ rewards persist atomically. Only explicitly confirmed camera submissions enter
 photo verification; starting a typed or voice turn clears the previous mission
 state. Reminders use local Android scheduling and never auto-send an agent request.
 Conversation, diary and memory actions use the existing reviewable composer.
+
+
+### Mission camera return routing
+
+The pet mission camera uses an activity-result request with a saved, per-pet
+origin marker. MainActivity still tears down dialogs/audio/network on stop; on
+camera completion, it restores the pet room before queued-photo processing. A
+confirmed mission photo reveals the pet conversation, while cancellation returns
+to the mission page. The origin survives parent-activity recreation, is consumed
+once, and is discarded if the companion identity no longer matches. Ordinary
+camera launches retain their normal Home destination. Photo bytes remain in
+memory only; process death does not automatically recreate or resend an image.

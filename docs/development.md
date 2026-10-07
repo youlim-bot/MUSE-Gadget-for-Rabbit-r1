@@ -250,3 +250,26 @@ The staged tree passed targeted artifact/secret/private-path/contact checks and
 local documentation-link checks. Existing custom public avatar art and demo
 separation were retained. This is a source commit; the V2.0 release binaries and
 showcase assets were not republished.
+
+
+### Mission camera navigation regression (2026-10-07)
+
+The `petCameraReturn` unpaired-emulator fixture exercises actual activity
+transitions, including MainActivity.onStop and CameraActivity.finish. A confirmed
+photo handoff restores the pet dialogue and displays a fictional model result
+there. Cancel returns to the mission page. Recreating the stopped parent while
+the camera is open retains the destination. An ordinary camera still returns to
+Home. The fixture does not send a real photo or record microphone input.
+
+Debug/Android test builds and 137 JVM tests passed in the private tree; public
+debug/demo/Android test builds and 137 JVM tests also passed. The navigation
+fixture passed with Android RESULT_OK. A native fictional-result screenshot was
+inspected. This follow-up is a source change; existing release assets are unchanged.
+
+The fix was subsequently installed on the owner's connected R1 via `adb install -r`.
+The installed hash and signing certificate were verified, all 21 existing private
+data files stayed unchanged across the update (runtime diagnostics excluded),
+and encrypted credentials remained unchanged after launch. Muse reached ready
+and the original side-button service remained bound. Lint retains 20 baseline
+errors, with none in the camera-return changes. Actual owner-photo submission
+was not performed; on-device live judgement remains a hands-on check.

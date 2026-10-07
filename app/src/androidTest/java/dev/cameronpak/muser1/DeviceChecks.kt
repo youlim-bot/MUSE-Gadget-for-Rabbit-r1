@@ -35,6 +35,7 @@ import kotlin.math.sin
 
 /** Local hardware checks. No Muse network calls or account credentials are fabricated. */
 class DeviceChecks : Instrumentation() {
+    private var petCameraReturn=false
     private var petActivities=false
     private var petDialogue=false
     private var petControls=false
@@ -62,6 +63,7 @@ class DeviceChecks : Instrumentation() {
     private var expectedTranscript = "Please say the words Muse on Rabbit is working and nothing else."
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        petCameraReturn=arguments?.getString("petCameraReturn")=="true"
         petActivities=arguments?.getString("petActivities")=="true"
         petDialogue=arguments?.getString("petDialogue")=="true"
         petControls=arguments?.getString("petControls")=="true"
@@ -92,6 +94,7 @@ class DeviceChecks : Instrumentation() {
     override fun onStart() {
         val result = Bundle()
         try {
+            if(petCameraReturn) { PetCameraReturnCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if(petActivities) { PetActivitiesCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if(petDialogue) { PetDialogueCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
             if(petControls) { PetControlsCheck.run(this,result);finish(Activity.RESULT_OK,result);return }
@@ -148,7 +151,7 @@ class DeviceChecks : Instrumentation() {
             result.putString("stream", "PASS: side-button service hold starts recording; nonzero 16kHz PCM captured; WAV lengths match; audio playback completed. No audio sent to Muse.")
             finish(Activity.RESULT_OK, result)
         } catch (error: Exception) {
-            val detail = if (petActivities || petControls || petLifecycle || reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
+            val detail = if (petCameraReturn || petActivities || petControls || petLifecycle || reminderUi || additions || screenTimeout || stopVoice || readingCheck || visual || historyCheck || buttonCheck || volumeCheck) "\n${error.stackTraceToString()}" else ""
             result.putString("stream", result.getString("stream", "") + "FAIL: " + error.javaClass.simpleName + detail)
             finish(Activity.RESULT_CANCELED, result)
         }

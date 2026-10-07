@@ -210,6 +210,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     }
     private fun record(kind:String,value:String="") { activitiesStore.event(pet.seed,kind,value) }
     internal fun showSpecialActivities() { if(!inGame && !host.petInputBusy){muteAudio();activities.show()} }
+    internal fun showMission() { if(!inGame && !host.petInputBusy)activities.mission() }
     internal fun showPromise(id:String) { if(!inGame && !host.petInputBusy)activities.promiseDetail(id) }
     private fun showSoundSettings() {
         val labels=arrayOf(t("성장에 맞춤","成長に合わせる","Follow growth"),t("숲 속 새소리","森の鳥の声","Forest birds"),t("포근한 오르골","やさしいオルゴール","Cozy music box"),t("밤의 정원","夜の庭","Night garden"),t("BGM 끄기","BGMオフ","Music off"))
