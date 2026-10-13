@@ -46,6 +46,21 @@ No GitHub Actions workflow is enabled: builds/tests run locally, avoiding runner
 
 The subsequent avatar refresh restores the original upstream `muse_character.png` byte-for-byte, rebuilds both APK variants, and recaptures the offline gallery. JVM tests were not rerun for this artwork/documentation-only refresh. See CREDITS for the artwork license boundary.
 
+## Physical R1 update caveat
+
+An in-place, same-signed `adb install -r` preserves app data, but an observed R1
+update removed Side button controls from Android's
+`enabled_accessibility_services` setting. With the device owner's authorization,
+record the exact service list and `accessibility_enabled` value privately before
+replacement, then verify both enablement and binding afterward. Installation
+success alone does not prove that Side button controls is running.
+
+Accessibility recovery needs separate owner authorization. Restore only the
+previously enabled Muse r1 service and its prior accessibility flag, preserving
+all other enabled services. If the pre-install record is missing, stop and ask
+the owner before changing settings. Keep these records out of public logs and
+documentation; do not clear app data or remove PIN protection to recover input.
+
 ## Offline demo and screenshots
 
 ```sh
@@ -273,3 +288,169 @@ and encrypted credentials remained unchanged after launch. Muse reached ready
 and the original side-button service remained bound. Lint retains 20 baseline
 errors, with none in the camera-return changes. Actual owner-photo submission
 was not performed; on-device live judgement remains a hands-on check.
+
+
+### Photo mission verdict handling (2026-10-08)
+
+The previous generic photo-verification failure was also emitted when the model
+reply did not match the JSON schema; it did not prove that the image was unreadable.
+Mission prompts now use a valid JSON example and explicitly include circular
+clock faces among round objects. One complete verdict object may be surrounded
+by prose or code fences. Boolean strings, multiple verdicts and incomplete
+objects cannot grant a reward. Ordinary prose is shown with an unconfirmed-verdict
+notice; malformed structured text is not displayed or read aloud.
+
+Six regressions cover wrapped Japanese clock verdicts, escaped braces, ambiguous
+responses, prose-only replies, malformed JSON and the photo transport size limit.
+Both source trees passed 143 JVM tests; private debug and public debug/demo APKs
+built successfully. The same-signed update was installed on the owner's R1,
+with all protected user-data files and accessibility settings preserved. Muse
+reached ready. The owner's original photo and raw model reply were unavailable;
+live image judgement requires another owner-confirmed submission.
+
+
+### Pet little world activities (2026-10-08)
+
+Five pet-only pages add a time-based three-planter garden, wheel pond fishing
+(and existing wheel games), multi-day learned tricks with optional custom cues,
+an explicitly saved private photo discovery album, and seven daily branching
+story chapters. KO/JA/EN labels and prompts follow the selected display language.
+New records are scoped to each companion and do not replace life or credentials.
+
+Both source trees passed 155 JVM tests. Private debug/Android test and public
+debug/demo/Android test builds succeeded. The unpaired-emulator `petWorld`
+fixture passed persistence, exactly-once garden collection, skills and cue
+collisions, story timing, album limits/delete/reply correlation, three-language
+UI within the OS viewport of a 480x640 test emulator, wheel/side volume routing
+without a microphone request, and actual album camera cancel/send navigation.
+The existing `petCameraReturn` activity-lifecycle regression also passed, including
+parent recreation and ordinary-camera return. Fixtures use synthetic dates,
+photos and replies; they do not establish live Muse vision or speech accuracy.
+
+A delayed dialog-dismiss callback can no longer clear a newer pet-room reference.
+Camera review retains the discovery language when reopened after cancellation.
+The same-signed update was installed on the owner's R1 with the installed APK
+hash verified. All 21 protected user-data files remained unchanged across
+installation (runtime diagnostics excluded), encrypted credentials were unchanged
+after launch, Muse reached ready, and the side-button accessibility service
+remained bound. Real-time growth, learned voice cues and live photo recognition
+remain owner hands-on checks. No GitHub commit/push or release update was made.
+
+Actual R1 inspection also verified all five new menu entries and opened the
+garden page. Its native 480x640 screenshot was inspected for visible header,
+scrollable content and fixed return control. No care action, camera capture or
+microphone input was performed during this device UI check.
+
+
+### Elapsed time and growth media prebuild (2026-10-08)
+
+Calendar time since the current life began is displayed as years/months/days/whole
+hours, including closed-app time. An exact reset archive or uncapped egg record
+restores the start; ambiguous legacy starts are marked approximate. Migration
+retains identity and care. Six transparent stage PNGs, five project-composed
+24-second music loops, six effects and twelve KO/JA/EN locally synthesized voice
+prototype clips are packaged. Growth and hatching rules are unchanged.
+
+Private debug/Android test and public debug/demo/Android test builds succeeded;
+both trees passed 164 JVM tests. The unpaired-emulator `petGrowth` check passed
+start persistence/migration, unclipped three-language elapsed labels, six native
+stage views, bounded sprite memory/eye landmarks, growth track choice, local
+voice playback in all three languages, music-off voice playback, mute/focus
+cancellation and disabled-voice guards. The music selection panel was changed
+to a scrolling full-screen list with fixed sound switches after native inspection
+found clipped alert-dialog buttons. Its final native view was inspected.
+The existing `petWorld` persistence/input/camera regression passed on the final
+APK with synthetic photos/replies. No network/microphone requests were performed.
+
+The signature-verified local APK includes all 29 new media assets. Screenshots
+use fictional unpaired-emulator care/start dates within the OS viewport of a
+480x640 test display. No owner R1 state was reset or changed, no physical-device
+installation or live audio/vision accuracy check was performed, and no commit,
+push or release publication was made. See [growth resource notes](pet-growth-assets.md).
+
+
+### Distinct growth stages and original adult installation (2026-10-08)
+
+Baby/child/teen silhouettes now differ clearly in body shape and head proportion.
+At the owner's request, the adult uses the unmodified, legless original Muse art;
+its lower-resolution source uses a smaller decode sample to remain sharp. The
+child/teen chest accents and blink landmarks match the new sprites. Adult care
+emblems float beside the original body when a form has been selected.
+
+Final private debug/AndroidTest and public debug/demo/AndroidTest builds succeeded;
+both trees passed 164 JVM tests with zero failures/errors. The final unpaired
+`petGrowth` fixture passed and its native growth captures were inspected. All
+29 media entries were verified inside the APK, including a byte-identical
+original adult PNG.
+
+The owner authorized an actual R1 update. Signing identity and installed APK
+hash matched; all 22 protected user-data files remained unchanged across install
+(runtime connection diagnostics excluded). Credentials were unchanged after
+launch, Muse reached ready, and Side button controls remained bound with its
+accessibility setting preserved. The actual pet home showed an unclipped elapsed
+time row; life identity and the saved start remained unchanged. No owner life
+reset, camera or microphone input was performed. Speaker quality and long-term
+growth remain hands-on checks. No GitHub commit/push or release update was made.
+
+### All character stages without feet or legs (2026-10-08, local only)
+
+At the owner's request, child, teenager and old-friend sprites were regenerated
+with one continuous rounded lower body and no feet or legs. Baby/egg remain
+unchanged; adult remains byte-identical to the original Muse image. Blink
+landmarks and chest-accent positions match the replacement art in both local
+source trees. Life, credentials, audio and existing unrelated edits are preserved.
+
+Private debug/AndroidTest and public debug/demo/AndroidTest builds succeeded.
+Each tree executed all 164 JVM tests with zero failures/errors. The unpaired,
+audio-disabled disposable emulator passed petGrowth with RESULT_OK (-1), and
+all six native stage captures plus the music panel were inspected. The first
+fixture attempt failed to focus the pet room because Android's first-use
+fullscreen tutorials obscured the app; after dismissing those tutorials on the
+disposable emulator, the fixture passed. No product or fixture change was needed
+for that startup issue. Existing unrelated lint failures were not rechecked
+and these successful builds do not imply clean lint.
+
+The new APK and image kit are local artifacts only. No physical-device operation,
+owner life reset, microphone/cloud test, Git commit, GitHub push or release
+update was performed for this revision. Earlier R1 installation evidence applies
+to the preceding image pack, not this footless replacement.
+
+### Footless growth update installed on R1 (2026-10-08)
+
+Following the owner's explicit installation request, the verified private APK
+was installed with adb install -r. Signing identity matched the existing package,
+and the installed APK hash matched the locally verified footless build. All 26
+protected files in no_backup, shared_prefs and files were byte-identical across
+installation; only runtime connection diagnostics were excluded. Credentials
+were unchanged after launch, Muse reached ready, the existing Side button controls
+service remained bound, and accessibility enablement was preserved.
+
+No life reset, microphone/camera use, live Muse turn, PIN/keylayout change, reboot,
+Git commit, GitHub push or release update was performed. Physical growth-stage
+previews and acoustic quality were not tested by this installation check; earlier
+unpaired-emulator captures cover the replacement sprites. The public debug/demo
+artifacts remain local builds; the installed device package is the private build.
+
+### Public app brightness and feeding port (2026-10-13)
+
+The public source adds Settings > Screen brightness (System, 20/40/60/80/100%)
+and applies the saved app-window override to activities and dialogs. System
+restores Android's brightness policy; no system-setting write or permission is
+added. Feeding advances life first, accepts food below 95 without a meal cooldown,
+and reports full/sleeping/egg/dead reasons while retaining bounded rewards.
+Public DEMO fixtures, permission separation and the conversation dolphin remain
+unchanged. See [architecture](architecture.md) and [exchange rules](feature-exchange.md).
+
+Executed in this public tree with Java 17 and the Android SDK:
+
+```sh
+./gradlew :app:assembleDebug :app:assembleDemo :app:assembleDebugAndroidTest :app:testDebugUnitTest
+```
+
+All four tasks passed; JUnit XML reports **204 tests, zero failures/errors/skips**.
+AndroidTest was compiled and packaged, not executed. Private-tree emulator and
+R1 installation evidence applies to the private build; this port did not perform
+emulator/device installation, instrumentation, live Muse tests, microphone or
+camera use, or lint. Physical brightness and wheel feel remain hands-on checks.
+The documentation distinguishes the conversation dolphin from the byte-identical
+original Muse adult sprite; all artwork remains outside the MIT code license.

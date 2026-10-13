@@ -1,6 +1,6 @@
 # Pet special activities
 
-Six activities are available in the pet room under **Special activities** (KO/JA/EN).
+Eleven activities are available in the pet room under **Special activities** (KO/JA/EN).
 The normal Feed/Play/Care/Sleep row stays in the room; it is not duplicated here.
 
 - **Solo exploration:** a healthy, awake, well-fed hatched companion can visit the
@@ -50,3 +50,35 @@ emulator: persistence, exactly-once rewards, recall, per-life isolation, invento
 mission nonces and daily cap, photo-reply correlation, recurring reminder
 schedule/cancel, and native 480x640 pages in three languages. It sends no live
 Muse requests. Actual camera-model accuracy is not established by these fixtures.
+
+
+## Little world activities
+
+The pet room's Special activities now also contains Little garden, Wheel
+minigames, Teach a trick, Photo discoveries, and Choose our story (KO/JA/EN).
+
+- Garden: three local planters, three seed kinds, four collectable flowers. Growth
+  uses elapsed wall time and care on distinct dates; repeated taps do not bloom a
+  plant. Long neglect can wilt it. No growth threshold or countdown is shown.
+- Games: a new 30-second pond-fishing game plus the existing star, memory and
+  rhythm games. Wheel moves; a short side-button press selects/casts. Holding the
+  side button and using the wheel controls media volume, with no microphone
+  request or cast on release. Leaving fishing cancels its timer and reward.
+- Skills: greetings, dance and jump become familiar through practice on distinct
+  days. An optional custom cue replaces the three-language defaults. Learned
+  cues in a pet text/voice turn select a bounded visual reaction; care state is
+  unchanged and egg/sleep/illness guards remain in effect.
+- Album: explicitly reviewed/sent photos are stored in app-private, non-backed-up
+  JPEG files, isolated by companion. Up to 24 images at the existing 180 KB photo
+  limit. Muse explanations attach only to the owning turn; duplicate replies do
+  not overwrite them. In-app preview, follow-up photo questions and confirmed
+  deletion are available. Ordinary photos and missions are not auto-archived.
+- Story: seven daily, branching fictional chapters. Choices persist across app
+  closure and shape the path and ending. Review earlier chapters or choose to
+  discuss the actual story with Muse. Local stories require no network.
+
+New records use `pet_world` preferences and the app-private `pet-discoveries`
+folder, separate from the existing pet life, credentials and voice preferences.
+Game facts are included only in pet dialogue context; cameras and Muse discussion
+remain explicit user actions. These activities are recorded in the existing
+local diary without revealing pet-growth formulas.

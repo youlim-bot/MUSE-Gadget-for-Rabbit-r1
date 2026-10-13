@@ -6,4 +6,4 @@ Voice notes are bounded recordings, not streaming dictation. Continuous interpre
 
 Display history means local rendered text; clearing it does not delete the remote Muse conversation. Favorites are independent local copies. Voice memos retain reviewed text, not an audio archive. Tasks are reviewed local checklists, not scheduled reminders.
 
-V2.0 uses the owner-provided Muse-generated dolphin in conversation and pet views; artwork is separate from the MIT code license. The offline demo uses fictional fixtures and a separate package with network, location, microphone and camera permissions removed. Pet growth in showcase images is simulated, not a real elapsed-time claim.
+V2.0 uses the owner-provided Muse-generated dolphin in conversation views and separate growth-stage pet sprites, including the unmodified original Muse adult artwork; artwork is separate from the MIT code license. The offline demo uses fictional fixtures and a separate package with network, location, microphone and camera permissions removed. Pet growth in showcase images is simulated, not a real elapsed-time claim.

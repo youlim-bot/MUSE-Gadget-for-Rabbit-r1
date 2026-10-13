@@ -119,3 +119,48 @@ to the mission page. The origin survives parent-activity recreation, is consumed
 once, and is discarded if the companion identity no longer matches. Ordinary
 camera launches retain their normal Home destination. Photo bytes remain in
 memory only; process death does not automatically recreate or resend an image.
+
+
+### Pet little world
+
+PetWorld domain rules use saved wall time for plant growth and daily practice/story
+choices, and monotonic time for active fishing rounds. PetWorldStore persists
+state per companion without modifying pet-growth counters. PetActivities owns
+page navigation and cancellable game input/timers. SideButtonService routes
+focused activity-page keys before the pet room; screen/focus lifecycle cancels
+pending input. Album camera launches reuse the saved pet-camera origin with a
+discovery nonce and category. Only an explicitly reviewed photo is retained, and
+only its correlated turn can attach a Muse explanation. Gallery discussion goes
+through the existing reviewable photo composer.
+
+### Growth art without feet or legs
+
+Every character stage has one continuous rounded lower body. Child, teenager and
+old-friend art uses generated footless variants of the original Muse identity;
+the baby is retained and the adult remains byte-identical to the original image.
+PetArt stores per-sprite blink coordinates. PetScene places chest accents below
+the new faces while retaining the original adult body without chest decoration.
+This resource change does not change PetState, PetStore, growth, care or audio.
+
+### App brightness and feeding
+
+Screen brightness is an app-private `display_options.brightness` preference,
+independent of CredentialStore. Settings offers System and 20/40/60/80/100%
+in a full-screen scrollable, wheel-navigable list sized for 240x320. The System
+option restores `screenBrightness=-1`; Android owns any automatic/manual system
+policy. Manual levels map to 0.20–1.00, with a 10% lower bound for programmatic
+inputs. No WRITE_SETTINGS permission or system setting write is used. MuseActivity
+applies the preference before the first frame and on resume in Main, pet's host,
+clock, library and camera. MuseDialog and MuseAlertDialogBuilder register their
+windows so an open dialog and underlying activity update together. Returning
+from Android settings reapplies the same app choice; Android's external windows
+retain their own system policy.
+
+Feeding advances life and exposes an explicit accepted/refusal result. An awake,
+living, hatched pet can eat while food is below 95; there is no feeding cooldown.
+At 95 or above the fullness bar fills completely and the room shows the full
+message. Tapping Feed during sleep shows the sleep message. Egg and death guards
+also return their actual reason if a meal chooser is already open. Egg care
+retains Warm rather than giving the egg a meal. Same-timestamp accepted meals
+produce the normal care/audio event without relying on a change in fedAt; food
+caps at 100, cake still costs health, counters saturate and wardrobe unlocks once.
