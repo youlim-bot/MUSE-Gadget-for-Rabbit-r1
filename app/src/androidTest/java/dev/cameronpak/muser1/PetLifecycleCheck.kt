@@ -79,7 +79,7 @@ internal object PetLifecycleCheck {
         }
         status("Migration, persistence, icon order, hidden egg progress and motion passed")
         val clock=System.currentTimeMillis()
-        installState(PetState(updatedAt=clock,incubationMs=72*PetState.HOUR))
+        installState(PetState(updatedAt=clock).let {it.copy(incubationMs=it.hatchDuration)})
         Thread.sleep(3200);ui{check(state().hatched && state().level==1)};capture("baby")
         ui{button("먹이").performClick()};clickMenu("구운 생선")
         ui{check(state().dietMask and (1 shl PetFood.FISH.ordinal)!=0)}

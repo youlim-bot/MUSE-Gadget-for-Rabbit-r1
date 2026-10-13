@@ -26,6 +26,11 @@ internal object PetActivityText {
         "mission"->t(c,"함께 ${target(c,e.value.toIntOrNull()?:0)}에 성공했어!","いっしょに「${target(c,e.value.toIntOrNull()?:0)}」を達成！","We completed: ${target(c,e.value.toIntOrNull()?:0)}!")
         "decorate"->t(c,"방의 장식을 바꿨어. 내 공간이 더 특별해졌어.","お部屋の飾りを変えたよ。もっと特別な場所になったね。","We changed the room. It feels more like ours.")
         "promise"->t(c,"${promise(c,e.value.toIntOrNull()?:3)} 약속을 함께 시작했어.","「${promise(c,e.value.toIntOrNull()?:3)}」の時間をいっしょに始めたよ。","We started our promise: ${promise(c,e.value.toIntOrNull()?:3)}.")
+        "garden"->t(c,"작은 정원을 함께 돌봤어.","小さな庭をいっしょに育てたよ。","We cared for our little garden.")
+        "skill"->t(c,"새로운 동작을 함께 연습했어.","新しい技をいっしょに練習したよ。","We practised a new trick.")
+        "story"->t(c,"우리 이야기에서 함께 길을 선택했어.","ふたりの物語で道を選んだよ。","We chose a path in our story.")
+        "wheel"->t(c,"연못에서 함께 놀았어.","池でいっしょに遊んだよ。","We played at the pond together.")
+        "discovery"->t(c,"사진으로 새로운 발견을 남겼어.","新しい発見を写真に残したよ。","We captured a new photo discovery.")
         "memory"->e.value
         else->""
     }

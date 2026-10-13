@@ -18,7 +18,7 @@ import java.util.Locale
 
 /** Local-only camera. Captures are held in memory until the user explicitly saves them. */
 @Suppress("DEPRECATION")
-class CameraActivity : Activity(), SurfaceHolder.Callback {
+class CameraActivity : MuseActivity(), SurfaceHolder.Callback {
     private var camera: Camera? = null
     private lateinit var surface: PreviewSurface
     private lateinit var photo: ImageView
@@ -107,7 +107,11 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
         retake = button(t("다시 촬영", "撮り直す", "Retake")) { jpeg = null; photo.setImageDrawable(null); showPreview(); openCamera() }
         capture = button("● " + t("촬영", "撮影", "Capture"), primary = true) { shoot() }
         save = button(t("사진 저장", "写真を保存", "Save photo")) { savePhoto() }
-        ask = button(t("Muse에 질문", "Museに質問", "Ask Muse"), primary = true) { askMuse() }
+        ask = button(t("Muse에 질문", "Museに質問", "Ask Muse"), primary = true) {
+            val language=InputLanguage.entries.firstOrNull {it.name==intent.getStringExtra("hunt_language") && it!=InputLanguage.AUTO}
+                ?: when(UiText.language(this)){DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH;else->InputLanguage.KOREAN}
+            askMuse(intent.getStringExtra("hunt_prompt"),language)
+        }
         bottom.addView(ask, LinearLayout.LayoutParams(dp(116), dp(48)))
         bottom.addView(retake, LinearLayout.LayoutParams(dp(100), dp(48)))
         bottom.addView(capture, LinearLayout.LayoutParams(dp(120), dp(48)))
@@ -121,7 +125,7 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
 
     override fun onWindowFocusChanged(focused: Boolean) {
         super.onWindowFocusChanged(focused)
-        if (focused && android.os.Build.VERSION.SDK_INT >= 30) window.insetsController?.apply {
+        if (focused) window.insetsController?.apply {
             systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsets.Type.systemBars())
         }
@@ -217,7 +221,7 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
     private fun choosePhotoLanguage() {
         if (busy || jpeg == null) return
         val languages = arrayOf(InputLanguage.KOREAN, InputLanguage.JAPANESE, InputLanguage.ENGLISH)
-        android.app.AlertDialog.Builder(this).setTitle(t("번역할 언어", "翻訳先の言語", "Translate into"))
+        MuseAlertDialogBuilder(this).setTitle(t("번역할 언어", "翻訳先の言語", "Translate into"))
             .setItems(languages.map { it.label }.toTypedArray()) { _, index ->
                 askMuse(PhotoPrompts.translate(languages[index]), languages[index])
             }.setNegativeButton(t("취소", "キャンセル", "Cancel"), null).show()
@@ -232,9 +236,9 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
             minLines = 2; maxLines = 4
             if(intent.hasExtra("pet_mission_token")){setText(PetActivityText.target(this@CameraActivity,intent.getIntExtra("pet_mission_target",0)));isEnabled=false}
         }
-        android.app.AlertDialog.Builder(this)
+        MuseAlertDialogBuilder(this)
             .setTitle(t("사진으로 Muse에 질문", "写真でMuseに質問", "Ask Muse about photo"))
-            .setMessage(t("사진과 질문이 Muse로 전송됩니다.", "写真と質問をMuseに送信します。", "The photo and question will be sent to Muse."))
+            .setMessage(if(intent.hasExtra("pet_discovery_token"))t("사진과 질문이 Muse로 전송되고 사진과 설명이 R1 도감에 보관됩니다.","写真と質問をMuseへ送信し、写真と説明をR1の図鑑に保存します。","The photo and question go to Muse. The photo and explanation are saved in this R1 album.") else t("사진과 질문이 Muse로 전송됩니다.", "写真と質問をMuseに送信します。", "The photo and question will be sent to Muse."))
             .setView(input)
             .setNegativeButton(t("취소", "キャンセル", "Cancel"), null)
             .setPositiveButton(t("보내기", "送信", "Send")) { _, _ ->
@@ -266,7 +270,7 @@ class CameraActivity : Activity(), SurfaceHolder.Callback {
                             translatePhoto.isEnabled = true; ask.isEnabled = true; retake.isEnabled = true; save.isEnabled = true
                             info.text = t("사진 준비 실패. 다시 촬영해 주세요.", "写真の準備に失敗しました。撮り直してください。", "Photo preparation failed. Retake the photo.")
                         } else {
-                            PhotoQuestion.pending = PhotoQuestion.Request(compressed, question, replyLanguage, if(intent.hasExtra("pet_seed"))intent.getLongExtra("pet_seed",0) else null, intent.getStringExtra("pet_mission_token"), intent.getIntExtra("pet_mission_target",-1))
+                            PhotoQuestion.pending = PhotoQuestion.Request(compressed, question, replyLanguage, if(intent.hasExtra("pet_seed"))intent.getLongExtra("pet_seed",0) else null, intent.getStringExtra("pet_mission_token"), intent.getIntExtra("pet_mission_target",-1),intent.getStringExtra("pet_discovery_token"),intent.getIntExtra("pet_discovery_kind",-1))
                             finish()
                         }
                     }

@@ -12,21 +12,26 @@ import android.view.*
 import android.widget.*
 
 /** Pet UI over the existing Muse session; all agent operations remain owned by MainActivity. */
-class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse) {
+class PetRoom(private val host: MainActivity) : MuseDialog(host, R.style.Theme_Muse) {
     private val resources get() = context.resources
     private val roomWindow get() = checkNotNull(window)
-    internal fun hasWindowFocus() = window?.decorView?.hasWindowFocus() == true
+    internal fun hasWindowFocus() = window?.decorView?.hasWindowFocus() == true || wardrobeDialog?.focused == true
     private val ink=Color.rgb(48,56,49)
     private val green=Color.rgb(77,110,76)
     private val cream=Color.rgb(246,241,223)
     private val handler=Handler(Looper.getMainLooper())
     private lateinit var audio:PetAudio
+    private var soundDialog:android.app.Dialog?=null
+    private var wardrobeDialog:PetWardrobeDialog?=null
+    private var knownWardrobe:Set<String>?=null
     private lateinit var store: PetStore
     private lateinit var pet: PetState
     private lateinit var room: PetScene
     private lateinit var growth: TextView
+    private lateinit var lifeElapsed: TextView
     private lateinit var notice: TextView
     private lateinit var hint: TextView
+    private lateinit var wardrobeButton:Button
     private lateinit var stats: LinearLayout
     private lateinit var playRow: LinearLayout
     private val meters=mutableListOf<Pair<TextView,ProgressBar>>()
@@ -63,7 +68,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         }
     }
     private fun endVoice(send:Boolean) { if(voiceOwned)host.petEndVoice(send);voiceOwned=false;held=false }
-    internal fun cancelAgentInput() { handler.removeCallbacks(voiceHold);sideGesture.cancel();endVoice(false);press=-1 }
+    internal fun cancelAgentInput() { wardrobeDialog?.cancelKeys();handler.removeCallbacks(voiceHold);sideGesture.cancel();endVoice(false);press=-1 }
     private fun showAgent() { if(inGame)finishGame(false,false);room.hatchStarted=0L;agentPane.visibility=View.VISIBLE }
     internal fun agentUpdate(status:String, text:String?=null, reveal:Boolean=false) {
         if(!::agentPane.isInitialized)return
@@ -82,7 +87,9 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     internal fun activityContext():String = org.json.JSONObject()
         .put("away_on_expedition",onTrip)
         .put("room_decoration",PetActivityText.item(context,activitiesStore.decoration(pet.seed)))
-        .put("conversation_practice_language",practiceLanguage ?: "none").toString()
+        .put("conversation_practice_language",practiceLanguage ?: "none")
+        .put("little_world",PetWorldStore(context).context(pet.seed))
+        .put("learned_skills",PetWorldStore(context).context(pet.seed).getJSONArray("learned_skills")).toString()
     internal fun dialogueState():PetState { pet=pet.advance(System.currentTimeMillis());return pet }
     internal fun answerExpression(expression:PetExpression) {
         val action=PetDialogue.allowed(expression,dialogueState())
@@ -126,6 +133,8 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         root.addView(header,LinearLayout.LayoutParams(-1,dp(48)))
         growth=label(11f).apply { gravity=Gravity.START or Gravity.CENTER_VERTICAL }
         root.addView(growth,LinearLayout.LayoutParams(-1,dp(26)))
+        lifeElapsed=label(11f).apply {gravity=Gravity.START or Gravity.CENTER_VERTICAL;maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END}
+        root.addView(lifeElapsed,LinearLayout.LayoutParams(-1,dp(22)))
         stats=LinearLayout(context)
         listOf(t("포만감","満腹","Food"),t("기분","気分","Mood"),t("체력","体力","Energy"),t("청결","清潔","Clean")).forEach { name ->
             val column=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(5),dp(3),dp(5),dp(5)) }
@@ -166,6 +175,8 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
             actions.add(b);controls.addView(b,LinearLayout.LayoutParams(0,dp(52),1f).apply { setMargins(dp(3),dp(4),dp(3),0) })
         }
         root.addView(controls,LinearLayout.LayoutParams(-1,dp(60)))
+        wardrobeButton=button(PetWardrobeText.title(context)){selected=4;showWardrobe()}
+        root.addView(wardrobeButton,LinearLayout.LayoutParams(-1,dp(44)).apply {topMargin=dp(4)})
         val agentBar=LinearLayout(context)
         val talk=button(t("말하기","話す","Talk")){}.apply {
             contentDescription=t("길게 눌러 Muse에게 말하기","長押しでMuseに話す","Hold to speak to Muse")
@@ -190,6 +201,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     internal fun refreshReplyMute() {
         if(!::replyMuteButton.isInitialized)return
         val muted=host.replyMuted
+        if(muted && ::audio.isInitialized)audio.stopCharacterVoice()
         replyMuteButton.setImageResource(if(muted)R.drawable.ic_quiet else R.drawable.ic_speaker)
         replyMuteButton.imageTintList=android.content.res.ColorStateList.valueOf(if(muted)Color.rgb(128,124,109) else green)
         replyMuteButton.isSelected=muted
@@ -209,18 +221,73 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         room.decoration=activitiesStore.decoration(pet.seed);dialogueScene.decoration=room.decoration
     }
     private fun record(kind:String,value:String="") { activitiesStore.event(pet.seed,kind,value) }
+    internal fun showWardrobe() {
+        if(inGame || host.petInputBusy)return
+        activities.close();cancelAgentInput();host.petStopSpeech();muteAudio()
+        pet=PetWardrobe.refresh(pet.advance(System.currentTimeMillis()),System.currentTimeMillis());save()
+        wardrobeDialog?.dismiss()
+        val d=PetWardrobeDialog(host,{pet},{slot,id->pet=PetWardrobe.equip(pet,slot,id);save();render()});wardrobeDialog=d
+        d.setOnDismissListener {if(wardrobeDialog===d)wardrobeDialog=null;render()}
+        d.show()
+    }
     internal fun showSpecialActivities() { if(!inGame && !host.petInputBusy){muteAudio();activities.show()} }
+    internal fun showDiscoveries() { if(!inGame && !host.petInputBusy)activities.discoveries() }
+    internal fun startWheelGame(kind:PetGame) {if(!onTrip && !host.petAudioBlocked)startGame(kind)}
+    internal fun activitySound(name:String,voice:String?=null) {
+        if(host.petAudioBlocked || pet.dead)return
+        audio.update(pet.level,pet.sleeping,false);audio.effect(name)
+        if(voice!=null && !host.replyMuted)audio.voice(voice,UiText.language(context))
+    }
+    internal fun completeWheelGame(won:Boolean) {pet=pet.advance(System.currentTimeMillis());if(pet.dead || pet.sleeping || !pet.hatched || onTrip)return;pet=pet.play(PetGame.STARS,won,System.currentTimeMillis());record("wheel");save();room.react("heart");activitySound(if(won)"win" else "chirp",if(won)"praise" else null);render()}
     internal fun showMission() { if(!inGame && !host.petInputBusy)activities.mission() }
     internal fun showPromise(id:String) { if(!inGame && !host.petInputBusy)activities.promiseDetail(id) }
     private fun showSoundSettings() {
-        val labels=arrayOf(t("성장에 맞춤","成長に合わせる","Follow growth"),t("숲 속 새소리","森の鳥の声","Forest birds"),t("포근한 오르골","やさしいオルゴール","Cozy music box"),t("밤의 정원","夜の庭","Night garden"),t("BGM 끄기","BGMオフ","Music off"))
-        android.app.AlertDialog.Builder(context).setTitle(t("배경음 · 효과음","BGM・効果音","Music & sounds"))
-            .setSingleChoiceItems(labels,PetSoundtrack.modes.indexOf(audio.mode)){dialog,index->audio.mode=PetSoundtrack.modes[index];dialog.dismiss()}
-            .setNeutralButton(if(audio.effects)t("효과음 끄기","効果音オフ","Effects off") else t("효과음 켜기","効果音オン","Effects on")){_,_->audio.effects=!audio.effects}
-            .setNegativeButton(t("닫기","閉じる","Close"),null).show()
+        val labels=PetSoundtrack.modes.map {mode->when(mode){
+            "auto"->t("성장에 맞춤","成長に合わせる","Follow growth")
+            "forest"->t("숲 속 새소리","森の鳥の声","Forest birds")
+            "musicbox"->t("포근한 오르골","やさしいオルゴール","Cozy music box")
+            "garden"->t("밤의 정원","夜の庭","Night garden")
+            "lullaby"->t("작은 자장가","小さな子守歌","Little lullaby")
+            "sprout"->t("새싹 산책","芽のお散歩","Sprout stroll")
+            "sunny"->t("햇살 놀이","日なたで遊ぼう","Sunny playtime")
+            "meadow"->t("초원의 오후","草原の午後","Meadow afternoon")
+            "starlight"->t("별빛 친구","星あかりの友だち","Starlight friend")
+            else->t("BGM 끄기","BGMオフ","Music off")
+        }}.toTypedArray()
+        soundDialog?.dismiss()
+        val d=MuseDialog(context,R.style.Theme_Muse);soundDialog=d
+        val root=LinearLayout(context).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(8),dp(12),dp(8));setBackgroundColor(cream)}
+        val header=LinearLayout(context).apply {gravity=Gravity.CENTER_VERTICAL}
+        header.addView(label(18f).apply {text=t("배경음 · 효과음","BGM・効果音","Music & sounds");typeface=Typeface.DEFAULT_BOLD},LinearLayout.LayoutParams(0,dp(56),1f))
+        header.addView(button(t("닫기","閉じる","Close")){d.dismiss()},LinearLayout.LayoutParams(dp(68),dp(48)));root.addView(header)
+        val choices=RadioGroup(context).apply {orientation=RadioGroup.VERTICAL}
+        val ids=mutableMapOf<Int,String>()
+        labels.forEachIndexed {index,label->
+            val id=View.generateViewId();ids[id]=PetSoundtrack.modes[index]
+            choices.addView(RadioButton(context).apply {this.id=id;text=label;textSize=14f;setTextColor(ink);minHeight=dp(52)
+                buttonTintList=android.content.res.ColorStateList.valueOf(green);isChecked=audio.mode==PetSoundtrack.modes[index]
+            },RadioGroup.LayoutParams(-1,-2))
+        }
+        choices.setOnCheckedChangeListener {_,id->ids[id]?.let {audio.mode=it;audio.update(pet.level,pet.sleeping,host.petAudioBlocked || pet.dead)}}
+        root.addView(ScrollView(context).apply {addView(choices)},LinearLayout.LayoutParams(-1,0,1f))
+        fun toggle(text:String,checked:Boolean,change:(Boolean)->Unit){
+            root.addView(Switch(context).apply {this.text=text;textSize=14f;setTextColor(ink);minHeight=dp(52);setPadding(dp(6),0,dp(6),0);isChecked=checked;setOnCheckedChangeListener {_,value->change(value)}},LinearLayout.LayoutParams(-1,dp(52)))
+        }
+        toggle(t("효과음","効果音","Sound effects"),audio.effects){audio.effects=it}
+        toggle(t("짧은 캐릭터 음성","短いキャラクターの声","Short character voice"),audio.characterVoice){audio.characterVoice=it}
+        d.setOnDismissListener {if(soundDialog===d)soundDialog=null}
+        d.setContentView(root);d.show();d.window?.apply {setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));setLayout(-1,-1);decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;decorView.post {if(d.isShowing)setLayout(-1,-1)}}
+
     }
     private fun say(ko:String,ja:String,en:String) { notice.text=t(ko,ja,en);messageUntil=SystemClock.elapsedRealtime()+3500L }
     private fun render() {
+        pet=PetWardrobe.refresh(pet,System.currentTimeMillis())
+        val unlocked=pet.wardrobe.unlocked.keys
+        val fresh=knownWardrobe?.let {unlocked-it}.orEmpty()
+        knownWardrobe=unlocked.toSet()
+        if(fresh.isNotEmpty()){notice.text=PetWardrobeText.notice(context,fresh.toList());messageUntil=SystemClock.elapsedRealtime()+5500L;store.save(pet)}
+        wardrobeButton.setTextColor(if(selected==4)Color.WHITE else ink)
+        wardrobeButton.background=panel(if(selected==4)green else 0xffe6e3cf.toInt(),12f)
         val stage=when(pet.level) { 0->t("알","たまご","Egg");1->t("아기 뮤즈","ベビーMuse","Baby Muse");2->t("어린 뮤즈","こどもMuse","Young Muse");3->t("자라는 뮤즈","育ちざかりMuse","Growing Muse");4->t("어른 뮤즈","おとなMuse","Adult Muse");else->t("오랜 친구","長年の友","Old friend") }
         val nature=when(pet.temperament) {
             PetTemperament.GRUMPY->t("삐쳐 있어요","すねています","Feeling grumpy")
@@ -231,11 +298,12 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
             else->t("느긋해요","のんびり","Easygoing")
         }
         growth.showText(when {pet.dead->t("함께한 시간을 기억해요","いっしょの時間を忘れない","Remembering our time together");!pet.hatched->t("작은 알과 함께하는 하루","小さなたまごとの一日","A day with a little egg");else->"$stage · $nature"})
+        lifeElapsed.showText(t("함께한 시간 · ","いっしょの時間 · ","Together · ")+PetElapsed.between(pet.startedAt,if(pet.dead)pet.diedAt else System.currentTimeMillis()).text(UiText.language(context),pet.startEstimated))
         stats.visibility=if(!pet.hatched || pet.dead)View.GONE else View.VISIBLE
         listOf(pet.food,pet.mood,pet.energy,pet.clean).forEachIndexed { i,value ->
             val feeling=if(value<25)t("부족","不足","Low") else if(value<60)t("보통","普通","Okay") else t("좋음","良好","Good")
             meters[i].first.showText("${meters[i].first.tag} $feeling")
-            meters[i].second.progress=when {value<25->15;value<60->50;else->85}
+            meters[i].second.progress=when {i==0 && value>=PetState.FULL_THRESHOLD->100;value<25->15;value<60->50;else->85}
         }
         if(pet.hatched && pet.sleeping && !inGame) selected=3
         actions.forEachIndexed { i,b ->
@@ -244,7 +312,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
                 b.setTextColor(if(i==selected) Color.WHITE else ink)
                 b.background=panel(if(i==selected) green else 0xffe6e3cf.toInt(),12f)
             }
-            b.isEnabled=!onTrip && !pet.dead && !inGame && room.hatchStarted==0L && !host.petAudioBlocked && (!pet.hatched || !pet.sleeping || i==3)
+            b.isEnabled=!onTrip && !pet.dead && !inGame && room.hatchStarted==0L && !host.petAudioBlocked && (!pet.hatched || !pet.sleeping || i==3 || i==0)
             b.alpha=if(b.isEnabled)1f else 0.4f
         }
         val names=if(!pet.hatched)listOf(t("온기","温める","Warm"),t("토닥","なでる","Pat"),t("닦기","拭く","Wipe"),t("자장가","子守歌","Lullaby")) else listOf(t("먹이","ごはん","Feed"),t("놀이","遊ぶ","Play"),t("돌봄","お世話","Care"),if(pet.sleeping)t("깨우기","起こす","Wake") else t("잠자기","寝る","Sleep"))
@@ -279,8 +347,9 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         dialogueScene.activity=host.petConversationActivity
         room.invalidate()
     }
-    private fun save() { store.save(pet);previousSave=SystemClock.elapsedRealtime() }
+    private fun save() { pet=PetWardrobe.refresh(pet,System.currentTimeMillis());store.save(pet);previousSave=SystemClock.elapsedRealtime() }
     private fun activate(index:Int) {
+        if(index==4){showWardrobe();return}
         if(onTrip || pet.dead || inGame || room.hatchStarted>0L || host.petAudioBlocked)return
         val now=System.currentTimeMillis();pet=pet.advance(now)
         if(!pet.hatched) {
@@ -289,7 +358,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
             audio.effect(when(index){2->"wash";3->"sleep";else->"chirp"})
             say("알이 기분 좋게 흔들려요!","たまごがうれしそうに揺れてる！","The egg wiggles happily!");render();return
         }
-        if(pet.sleeping && index!=3)return
+        if(pet.sleeping && index!=3){if(index==0)sayFeedRefusal(PetFeedRefusal.SLEEPING);render();return}
         if(index==1) {
             if(pet.energy<10) { say("먼저 잠을 자고 체력을 채워 주세요","先に眠って体力を回復してね","Rest first to restore energy");render();return }
             chooseGame();return
@@ -300,26 +369,34 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         effect=""
         pet=pet.care(PetAction.entries[index],now);save();if(pet!=before && pet.sleeping)record("sleep")
         when(index) {
-            0->{effect="food";if(before.food>=99)say("배불러요! 조금 있다 먹어요","おなかいっぱい！またあとで","I'm full! A snack later, please.") else say("냠냠! 맛있어요","もぐもぐ！おいしいね","Yum! That was delicious.")}
             2->{effect="wash";say("보송보송, 기분 좋아요!","ぴかぴか！気持ちいいね","Fresh and clean. Thank you!")}
             3->{if(pet.sleeping) say("잘 자요. 나가도 계속 쉴게요","おやすみ。画面を閉じても休むよ","Good night. I'll rest while you're away.") else say("잘 잤어요! 같이 놀아요","よく寝たよ！いっしょに遊ぼう","I'm awake! Let's play.")}
         }
         audio.effect(if(pet.level>before.level)"level" else when(index){0->"feed";2->"wash";else->if(pet.sleeping)"sleep" else "chirp"})
         room.react(if(pet.level>before.level)"level" else effect.ifEmpty { if(pet.sleeping)"sleep" else "chirp" })
+        if(pet.sleeping && !before.sleeping && !host.replyMuted)audio.voice("sleep",UiText.language(context))
         if(pet.level>before.level)say("레벨 업! 뮤즈가 성장했어요","レベルアップ！Museが成長したよ","Level up! Muse has grown.")
         render()
     }
     private fun choices(title:String,labels:List<String>,pick:(Int)->Unit) {
-        android.app.AlertDialog.Builder(context).setTitle(title).setItems(labels.toTypedArray()){_,i->pick(i)}
+        MuseAlertDialogBuilder(context).setTitle(title).setItems(labels.toTypedArray()){_,i->pick(i)}
             .setNegativeButton(t("닫기","閉じる","Close"),null).show()
     }
     private fun chooseFood() {
         val names=listOf(t("따뜻한 우유","あたたかいミルク","Warm milk"),t("포근한 죽","おかゆ","Porridge"),t("숲속 베리","森のベリー","Forest berries"),t("구운 생선","焼き魚","Grilled fish"),t("채소 한 접시","野菜プレート","Vegetable plate"),t("작은 케이크 · 가끔만","小さなケーキ · たまにね","Small cake · an occasional treat"))
         choices(t("오늘은 무엇을 먹을까요?","今日は何を食べよう？","What's on the menu?"),names){i->
-            val now=System.currentTimeMillis();val before=pet.advance(now);pet=before.feed(PetFood.entries[i],now);save()
-            if(pet.fedAt!=before.fedAt){record("food");room.react("food");audio.effect("feed");say("냠냠… 함께 먹으니 좋아요","もぐもぐ…いっしょでうれしい","Yum… it's nice to eat together.")}
-            else say("아직 배불러요. 조금 있다 먹어요","まだおなかいっぱい。またあとで","Still full. Let's eat a little later.")
+            val now=System.currentTimeMillis();val result=pet.feedResult(PetFood.entries[i],now);pet=result.state;save()
+            if(result.accepted){record("food");room.react("food");audio.effect("feed");if(!host.replyMuted)audio.voice("thanks",UiText.language(context));say("냠냠… 함께 먹으니 좋아요","もぐもぐ…いっしょでうれしい","Yum… it's nice to eat together.")}
+            else sayFeedRefusal(checkNotNull(result.refusal))
             render()
+        }
+    }
+    private fun sayFeedRefusal(reason:PetFeedRefusal) {
+        when(reason) {
+            PetFeedRefusal.FULL -> say("배불러요. 조금 있다 먹어요","おなかいっぱい。またあとで食べよう","I'm full. Let's eat a little later.")
+            PetFeedRefusal.SLEEPING -> say("자고 있어요… 깨면 먹어요","眠っているよ…起きたら食べよう","I'm sleeping… I'll eat when I wake up.")
+            PetFeedRefusal.EGG -> say("아직 알이에요. 태어나면 먹어요","まだたまごだよ。生まれたら食べよう","Still an egg. I'll eat after I hatch.")
+            PetFeedRefusal.DEAD -> say("이 친구는 이제 음식을 먹을 수 없어요","この子はもう食べられないよ","This friend can no longer eat.")
         }
     }
     private fun chooseCare() {
@@ -379,6 +456,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     private fun finishGame(won:Boolean,completed:Boolean=true) {
         gameEnds=0;playRow.visibility=View.GONE
         if(completed){record("play");pet=pet.play(game,won,System.currentTimeMillis());save();audio.effect(if(won)"win" else "chirp");room.react("heart")}
+        if(won && !host.replyMuted)audio.voice("praise",UiText.language(context))
         if(won)say("해냈어요! 같이 놀아서 즐거워요","できた！いっしょで楽しいね","We did it! That was fun together.")
         else say("함께 연습해요. 이기지 않아도 괜찮아요","いっしょに練習しよう。勝てなくても大丈夫","Let's practise together. It's okay not to win.")
         hint.text=t("길게 눌러 말하기 · 측면 버튼 + 휠: 음량","長押しで話す · サイドボタン＋ホイール：音量","Hold to talk · Side button + wheel: volume")
@@ -386,6 +464,8 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     }
     private val tick=object:Runnable { override fun run() {
         val elapsed=SystemClock.elapsedRealtime()
+        var justHatched=false
+        val previousLevel=pet.level
         val visible=hasWindowFocus() && agentPane.visibility!=View.VISIBLE && context.getSystemService(android.os.PowerManager::class.java).isInteractive
         pet=pet.advance(System.currentTimeMillis())
         // Offline wall time advances in PetState, never from frame count.
@@ -394,11 +474,13 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         if(visible && pet.hatchReady) {
             if(room.hatchStarted==0L) { room.hatchStarted=elapsed;messageUntil=0L }
             if(!ValueAnimator.areAnimatorsEnabled() || elapsed-room.hatchStarted>=2600L) {
-                pet=pet.hatch(System.currentTimeMillis());record("hatch");room.hatchStarted=0L;room.react("hatch");audio.effect("level");save()
+                pet=pet.hatch(System.currentTimeMillis());record("hatch");room.hatchStarted=0L;room.react("hatch");justHatched=true;save()
                 say("안녕! 아기 뮤즈가 태어났어요","こんにちは！ベビーMuseが生まれたよ","Hello! Baby Muse has hatched.")
             }
         }
-        audio.update(pet.level,pet.sleeping,pet.dead || !hasWindowFocus() || host.petAudioBlocked)
+        audio.update(pet.level,pet.sleeping,pet.dead || (!hasWindowFocus() && PetActivities.foreground?.focused!=true && soundDialog?.window?.decorView?.hasWindowFocus()!=true) || host.petAudioBlocked)
+        if(justHatched){audio.effect("hatch");if(!host.replyMuted)audio.voice("hello",UiText.language(context))}
+        else if(pet.level>previousLevel && visible){room.react("level");audio.effect("level");if(!host.replyMuted)audio.voice("praise",UiText.language(context))}
         if(inGame)updateGame()
         if(SystemClock.elapsedRealtime()-previousSave>if(pet.hatched)60_000 else 5_000)save()
         render();handler.postDelayed(this,250)
@@ -411,6 +493,8 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     }
     override fun onStop() {
         if(foreground===this)foreground=null
+        wardrobeDialog?.dismiss();wardrobeDialog=null
+        soundDialog?.dismiss();soundDialog=null
         activities.close()
         cancelAgentInput();handler.removeCallbacksAndMessages(null)
         if(inGame)finishGame(false,false)
@@ -423,7 +507,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         if(voiceOwned || held)return
         if(agentPane.visibility==View.VISIBLE){agentScroll.smoothScrollBy(0,dp(60)*delta);return}
         if(inGame) { selectedTile=(selectedTile+delta+3)%3;updateGame() }
-        else { selected=if(pet.hatched && pet.sleeping)3 else (selected+delta+4)%4;render() }
+        else { selected=if(pet.hatched && pet.sleeping)if(selected==4)3 else 4 else (selected+delta+5)%5;render() }
     }
     private fun wheel(delta:Int) {
         if(sideGesture.canAdjustVolume && hasWindowFocus()) {
@@ -434,6 +518,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
         } else move(delta)
     }
     internal fun petKey(event:KeyEvent):Boolean {
+        if(wardrobeDialog?.focused==true)return wardrobeDialog?.key(event)==true
         when(event.keyCode) {
             KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN -> {
                 if(event.action==KeyEvent.ACTION_DOWN)wheel(if(event.keyCode==KeyEvent.KEYCODE_DPAD_UP)-1 else 1)
@@ -480,7 +565,7 @@ class PetRoom(private val host: MainActivity) : Dialog(host, R.style.Theme_Muse)
     }
     private fun confirmNewEgg() {
         if(inGame || host.petAudioBlocked)return
-        android.app.AlertDialog.Builder(context).setTitle(t("알부터 다시 시작", "たまごからやり直す", "Start from an egg"))
+        MuseAlertDialogBuilder(context).setTitle(t("알부터 다시 시작", "たまごからやり直す", "Start from an egg"))
             .setMessage(t("현재 육성 기록은 보관하고 새 알을 맞이합니다. 대화와 음성 설정은 유지됩니다.","今の育成記録を保管して、新しいたまごを迎えます。会話と音声設定は変わりません。","Archive this pet and welcome a new egg. Conversation and voice settings stay unchanged."))
             .setNegativeButton(t("취소","キャンセル","Cancel"),null)
             .setPositiveButton(t("새 알 맞이하기","たまごを迎える","Welcome an egg")){_,_->

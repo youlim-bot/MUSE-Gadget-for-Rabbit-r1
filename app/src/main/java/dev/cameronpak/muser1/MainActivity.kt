@@ -25,7 +25,7 @@ import dev.cameronpak.muser1.pairing.PairingServer
 import dev.cameronpak.muser1.transport.MuseConnection
 import kotlinx.coroutines.*
 
-class MainActivity : Activity() {
+class MainActivity : MuseActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val store get() = (application as MuseApp).store
     private var pairing: PairingServer? = null
@@ -41,7 +41,7 @@ class MainActivity : Activity() {
     private var pairingWindow: Job? = null
     private var turnTimeout: Job? = null
     private var transcriptFetch: Job? = null
-    private var controls: AlertDialog? = null
+    private var controls: android.app.Dialog? = null
     private var clearDialog: AlertDialog? = null
     private var composer: AlertDialog? = null
     private var typedDraft = ""
@@ -95,7 +95,7 @@ class MainActivity : Activity() {
     private fun endFunMode(){funModes.mode="";refreshFunStatus();stopReplySpeech()}
     private fun showHunt() {
         stopContinuous(false);speech.stop();funModes.mode="hunt";refreshFunStatus()
-        controls=AlertDialog.Builder(this).setTitle(funText("카메라 보물찾기","カメラ宝探し","Camera treasure hunt"))
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("카메라 보물찾기","カメラ宝探し","Camera treasure hunt"))
             .setMessage(huntLabel()+"\n\n"+funText("주변의 물건을 찍어 Muse에게 확인받으세요. 사진 전송 전 확인할 수 있습니다.","身近なものを撮ってMuseに確認しましょう。送信前に写真を確認できます。","Photograph a nearby object and ask Muse to check it. Review the photo before sending."))
             .setPositiveButton(funText("사진 찍기","撮影","Take photo")){_,_->
                 val lang=when(UiText.language(this)){DisplayLanguage.KO->InputLanguage.KOREAN;DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH}
@@ -105,10 +105,10 @@ class MainActivity : Activity() {
     }
     private fun choosePractice() {
         stopContinuous(false);speech.stop()
-        controls=AlertDialog.Builder(this).setTitle(funText("연습할 언어","練習する言語","Practice language"))
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("연습할 언어","練習する言語","Practice language"))
             .setItems(arrayOf("한국어","日本語","English")){_,which->
                 val chosen=arrayOf(InputLanguage.KOREAN,InputLanguage.JAPANESE,InputLanguage.ENGLISH)[which]
-                controls=AlertDialog.Builder(this).setTitle(funText("상황 선택 · 연습 시작","場面を選んで開始","Choose a scenario to start"))
+                controls=MuseAlertDialogBuilder(this).setTitle(funText("상황 선택 · 연습 시작","場面を選んで開始","Choose a scenario to start"))
                     .setItems(arrayOf(funText("카페 주문","カフェで注文","Order at a cafe"),funText("여행·길 묻기","旅行・道を尋ねる","Travel / directions"),funText("일상 대화","日常会話","Everyday chat"))){_,scene->
                         if(!connected || sending || recording){screen.showNotice(funText("Muse 연결 후 다시 시작해 주세요.","Muse接続後に再開してください。","Connect to Muse before starting."));return@setItems}
                         funModes.language=chosen;funModes.scene=scene;funModes.mode="practice"
@@ -118,7 +118,7 @@ class MainActivity : Activity() {
             }.setNegativeButton(tr("닫기"),null).show()
     }
     private fun showPracticeControls() {
-        controls=AlertDialog.Builder(this).setTitle(funText("회화 파트너","会話パートナー","Conversation partner"))
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("회화 파트너","会話パートナー","Conversation partner"))
             .setMessage(funText("측면 버튼으로 말하거나 키보드로 답하세요. 짧은 답변과 표현 교정을 받습니다. 발음 평가는 하지 않습니다.","サイドボタンで話すか文字で返答。短い応答と表現の訂正を行います。発音採点はしません。","Use the side button or keyboard to reply. Get brief replies and expression corrections, not pronunciation scores."))
             .setPositiveButton(funText("언어·상황 변경","言語・場面を変更","Change scenario")){_,_->choosePractice()}
             .setNeutralButton(funText("키보드로 답하기","文字で返答","Type reply")){_,_->showComposer()}
@@ -159,7 +159,7 @@ class MainActivity : Activity() {
     private val deskDelaySeconds get() = getSharedPreferences("reading", MODE_PRIVATE).getInt("desk_clock_delay_seconds",20).takeIf { it in deskDelayOptions } ?: 20
     private fun deskDelayLabel(seconds:Int):String = if(seconds<60) funText("${seconds}초","${seconds}秒","${seconds} sec") else funText("${seconds/60}분","${seconds/60}分","${seconds/60} min")
     private fun showDeskDelaySettings() {
-        controls=AlertDialog.Builder(this).setTitle(funText("시계 전환 대기 시간","時計への切替待ち時間","Clock idle delay"))
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("시계 전환 대기 시간","時計への切替待ち時間","Clock idle delay"))
             .setSingleChoiceItems(deskDelayOptions.map { deskDelayLabel(it) }.toTypedArray(),deskDelayOptions.indexOf(deskDelaySeconds)){dialog,index->
                 getSharedPreferences("reading",MODE_PRIVATE).edit().putInt("desk_clock_delay_seconds",deskDelayOptions[index]).apply()
                 lastInteraction=android.os.SystemClock.elapsedRealtime();dialog.dismiss();showDeskClockSettings()
@@ -175,7 +175,7 @@ class MainActivity : Activity() {
             clearDialog?.isShowing != true && languageDialog?.isShowing != true && displayLanguagePopup?.isShowing != true) openDeskClock()
     }
     private fun showDeskClockSettings() {
-        controls = AlertDialog.Builder(this).setTitle(UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"))
+        controls = MuseAlertDialogBuilder(this).setTitle(UiText.text(this,"충전 중 탁상시계","充電中の置き時計","Charging desk clock"))
             .setSingleChoiceItems(arrayOf(
                 UiText.text(this,"켜기 · ${deskDelayLabel(deskDelaySeconds)} 후 표시","オン · ${deskDelayLabel(deskDelaySeconds)}後に表示","On · after ${deskDelayLabel(deskDelaySeconds)} idle"),
                 UiText.text(this,"끄기","オフ","Off")), if(deskEnabled)0 else 1) { dialog, index ->
@@ -481,16 +481,17 @@ class MainActivity : Activity() {
     private var petDialogueRoom:PetRoom?=null
     private fun preparePetDialogue() {
         missionPhoto=null;missionConversation=null;missionChunks.clear();missionDone.clear()
+        discoveryPhoto=null;discoveryConversation=null
         petDialogueRoom=petRoom?.takeIf { it.isShowing }
         petDialogueTurn=petDialogueRoom?.let { PetDialogueTurn(it.dialogueState(),it.practiceLanguage ?: UiText.language(this).name.lowercase(java.util.Locale.ROOT),it.activityContext()) }
     }
     internal val petConversationActivity get()=when { recording->"listening";sending->"thinking";speech.hasPlayback->"speaking";else->"" }
 
     private fun showPetRoom() {
-        if(recording || sending || petRoom!=null)return
+        if(recording || sending || petRoom?.isShowing==true)return
         stopContinuous(false);speech.stop();closeDeskClock()
         val room=PetRoom(this);petRoom=room
-        room.setOnDismissListener { petRoom=null;lastInteraction=android.os.SystemClock.elapsedRealtime() }
+        room.setOnDismissListener { if(petRoom===room)petRoom=null;lastInteraction=android.os.SystemClock.elapsedRealtime() }
         room.show()
     }
     internal fun petPractice(language:String?) { petRoom?.practiceLanguage=language }
@@ -504,6 +505,26 @@ class MainActivity : Activity() {
     internal fun petMissionCamera(seed:Long,token:String,target:Int) {
         if(!connected || sending || recording){android.widget.Toast.makeText(this,funText("Muse 연결 후 시도해 주세요","Museに接続してから試してね","Connect to Muse first"),android.widget.Toast.LENGTH_LONG).show();return}
         launchPetMissionCamera(seed,token,target)
+    }
+    @Suppress("DEPRECATION")
+    internal fun petDiscoveryCamera(seed:Long,kind:Int) {
+        if(!connected || sending || recording || kind !in 0..2 || PetStore(this).load(System.currentTimeMillis()).seed!=seed){
+            android.widget.Toast.makeText(this,funText("Muse 연결 후 시도해 주세요","Museに接続してから試してね","Connect to Muse first"),android.widget.Toast.LENGTH_LONG).show();return
+        }
+        val token=java.util.UUID.randomUUID().toString()
+        petCameraOrigin=Bundle().apply {putLong("seed",seed);putString("token",token);putString("kind","discovery")}
+        petCameraReturned=false
+        val lang=when(UiText.language(this)){DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH;else->InputLanguage.KOREAN}
+        try {startActivityForResult(Intent(this,CameraActivity::class.java).putExtra("hunt_prompt",PetWorldText.photoPrompt(this,kind))
+            .putExtra("hunt_language",lang.name).putExtra("pet_seed",seed).putExtra("pet_discovery_token",token).putExtra("pet_discovery_kind",kind),petCameraRequest)}
+        catch(error:RuntimeException){petCameraOrigin=null;throw error}
+    }
+    internal fun petDiscoveryQuestion(seed:Long,id:String) {
+        if(PetStore(this).load(System.currentTimeMillis()).seed!=seed)return
+        val photo=PetWorldStore(this).photos(seed).firstOrNull {it.id==id}?:return
+        val file=PetWorldStore(this).file(seed,id);if(!file.exists())return
+        val lang=when(UiText.language(this)){DisplayLanguage.JA->InputLanguage.JAPANESE;DisplayLanguage.EN->InputLanguage.ENGLISH;else->InputLanguage.KOREAN}
+        showComposer(PetWorldText.photoPrompt(this,photo.kind),plainConversation=true,photo=PhotoQuestion.Request(file.readBytes(),photo.question,lang))
     }
     @Suppress("DEPRECATION")
     private fun launchPetMissionCamera(seed:Long,token:String,target:Int) {
@@ -530,17 +551,19 @@ class MainActivity : Activity() {
         val origin=petCameraOrigin?:run {petCameraReturned=false;return}
         val seed=origin.getLong("seed")
         if(PetStore(this).load(System.currentTimeMillis()).seed!=seed) {
-            if(PhotoQuestion.pending?.let {it.petSeed==seed && it.petMissionToken==origin.getString("token")}==true)PhotoQuestion.pending=null
+            if(PhotoQuestion.pending?.let {it.petSeed==seed && it.petCameraToken==origin.getString("token")}==true)PhotoQuestion.pending=null
             petCameraOrigin=null;petCameraReturned=false;return
         }
         showPetRoom()
         val room=petRoom?.takeIf {it.isShowing}?:return
         petCameraOrigin=null;petCameraReturned=false
         val photo=PhotoQuestion.pending
-        if(photo!=null && photo.petSeed==seed && photo.petMissionToken==origin.getString("token")) {
-            room.agentUpdate(funText("미션 사진 · 연결을 기다리고 있어요","ミッション写真 · 接続を待っています","Mission photo · Waiting for connection"),"",reveal=true)
-        } else room.showMission()
+        if(photo!=null && photo.petSeed==seed && photo.petCameraToken==origin.getString("token")) {
+            room.agentUpdate(if(origin.getString("kind")=="discovery")funText("도감 사진 · 연결을 기다리고 있어요","図鑑の写真 · 接続を待っています","Album photo · Waiting for connection")else funText("미션 사진 · 연결을 기다리고 있어요","ミッション写真 · 接続を待っています","Mission photo · Waiting for connection"),"",reveal=true)
+        } else if(origin.getString("kind")=="discovery")room.showDiscoveries() else room.showMission()
     }
+    private var discoveryPhoto:PhotoQuestion.Request?=null
+    private var discoveryConversation:ConversationTurn?=null
     private var missionPhoto:PhotoQuestion.Request?=null
     private var missionConversation:ConversationTurn?=null
     private val missionChunks=mutableMapOf<String,String>()
@@ -617,7 +640,7 @@ class MainActivity : Activity() {
             16, 15, 14      // Pet room, practice and play. Preferences live in Settings.
         )
         val orderedLabels = actionOrder.map { labels[it] }.toTypedArray()
-        quickDialog = AlertDialog.Builder(this).setTitle(UiText.text(this, "빠른 기능", "クイック機能", "Quick actions"))
+        quickDialog = MuseAlertDialogBuilder(this).setTitle(UiText.text(this, "빠른 기능", "クイック機能", "Quick actions"))
             .setItems(orderedLabels) { _, position ->
                 val which = actionOrder[position]
                 when (which) {
@@ -625,7 +648,7 @@ class MainActivity : Activity() {
                     7 -> {
                         val photo = PhotoQuestion.last
                         if (photo == null) screen.showNotice(UiText.text(this, "먼저 사진을 찍어 Muse에 보내 주세요. 앱이 종료되면 사진은 기억하지 않습니다.", "先に写真をMuseに送ってください。アプリ終了後は写真を保持しません。", "Send a photo first. Photos are not retained after the app process ends."))
-                        else controls = AlertDialog.Builder(this).setTitle(UiText.text(this, "이전 사진", "前の写真", "Previous photo"))
+                        else controls = MuseAlertDialogBuilder(this).setTitle(UiText.text(this, "이전 사진", "前の写真", "Previous photo"))
                             .setItems(arrayOf(UiText.text(this, "같은 사진으로 질문", "同じ写真で質問", "Ask with same photo"), UiText.text(this, "사진 기억 지우기", "写真を忘れる", "Forget photo"))) { _, choice ->
                                 if (choice == 0) showComposer("", true, photo) else PhotoQuestion.last = null
                             }.show()
@@ -635,7 +658,7 @@ class MainActivity : Activity() {
                     10 -> showScreenTimeoutSettings()
                     11 -> showClockPanel(ClockCommand("reminder"))
                     12 -> showDeskClockSettings()
-                    13 -> controls=AlertDialog.Builder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
+                    13 -> controls=MuseAlertDialogBuilder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
                         .setSingleChoiceItems(arrayOf(funText("켜기","オン","On"),funText("끄기","オフ","Off")),if(getSharedPreferences("gadget_ui",MODE_PRIVATE).getBoolean("reactive_avatar",true))0 else 1){d,index->getSharedPreferences("gadget_ui",MODE_PRIVATE).edit().putBoolean("reactive_avatar",index==0).apply();screen.invalidateAvatar();d.dismiss()}.show()
                     14 -> showHunt()
                     15 -> choosePractice()
@@ -681,6 +704,7 @@ class MainActivity : Activity() {
             entry("wifi","Wi-Fi","",connection){openWifiPanel()},
             entry("reading",funText("글자 크기·음성 속도","文字サイズ・音声速度","Text size & voice speed"),funText("편하게 읽고 듣기","読みやすさ・聞きやすさ","Reading and speech preferences")){showReadingSettings()},
             entry("volume",funText("음량","音量","Volume"),funText("음성 답변·배경음 크기","音声応答・BGMの音量","Voice and music volume")){showVolumeSettings()},
+            entry("brightness",funText("화면 밝기","画面の明るさ","Screen brightness"),funText("시스템 또는 20–100% 선택","システムまたは20–100%","System or 20–100%")){showBrightnessSettings()},
             entry("screen",funText("화면 자동 꺼짐","画面の自動消灯","Screen timeout"),funText("Muse 화면 계속 켜기 선택","Muse画面の常時点灯","Choose whether Muse stays awake")){showScreenTimeoutSettings()},
             entry("clock",funText("충전 중 탁상시계","充電中の置き時計","Charging desk clock"),funText("시계 표시·전환 대기 시간","時計表示・切替待ち時間","Clock display and idle delay")){showDeskClockSettings()},
             entry("avatar",funText("반응하는 아바타","アバターの動き","Reactive avatar"),funText("대화 중 아바타 움직임","会話中のアバターの動き","Avatar animation during conversation")){showAvatarSettings()},
@@ -702,13 +726,16 @@ class MainActivity : Activity() {
         }
     }
     private fun showAvatarSettings() {
-        controls=AlertDialog.Builder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("반응하는 아바타","アバターの動き","Reactive avatar"))
             .setSingleChoiceItems(arrayOf(funText("켜기","オン","On"),funText("끄기","オフ","Off")),if(getSharedPreferences("gadget_ui",MODE_PRIVATE).getBoolean("reactive_avatar",true))0 else 1){d,index->
                 getSharedPreferences("gadget_ui",MODE_PRIVATE).edit().putBoolean("reactive_avatar",index==0).apply();screen.invalidateAvatar();d.dismiss()
             }.setNegativeButton(tr("닫기"),null).show()
     }
+    private fun showBrightnessSettings() {
+        controls=BrightnessDialog(this).also {it.show()}
+    }
     private fun showSettingsLanguage() {
-        controls=AlertDialog.Builder(this).setTitle(funText("표시 언어","表示言語","Display language"))
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("표시 언어","表示言語","Display language"))
             .setSingleChoiceItems(DisplayLanguage.entries.map{"${it.flag} ${it.label}"}.toTypedArray(),UiText.language(this).ordinal){d,index->
                 UiText.set(this,DisplayLanguage.entries[index]);refreshLanguageControls();screen.refreshDisplayLanguage();if(hasConversation)renderConversation()
                 d.dismiss();settingsDialog?.dismiss();showSettingsMenu()
@@ -726,11 +753,11 @@ class MainActivity : Activity() {
             override fun onStopTrackingTouch(bar:android.widget.SeekBar){}
         })
         content.addView(label);content.addView(slider,LinearLayout.LayoutParams(-1,(64*resources.displayMetrics.density).toInt()));update()
-        controls=AlertDialog.Builder(this).setTitle(funText("음량","音量","Volume")).setView(content).setNegativeButton(tr("닫기"),null).show()
+        controls=MuseAlertDialogBuilder(this).setTitle(funText("음량","音量","Volume")).setView(content).setNegativeButton(tr("닫기"),null).show()
     }
 
     private fun showScreenTimeoutSettings() {
-        controls = AlertDialog.Builder(this)
+        controls = MuseAlertDialogBuilder(this)
             .setTitle(UiText.text(this, "화면 자동 꺼짐", "画面の自動消灯", "Screen timeout"))
             .setSingleChoiceItems(arrayOf(
                 UiText.text(this, "켜기 · 일정 시간 후 꺼짐", "オン · 一定時間で消灯", "On · turn off after inactivity"),
@@ -745,12 +772,12 @@ class MainActivity : Activity() {
     }
 
     private fun showReadingSettings() {
-        controls = AlertDialog.Builder(this).setTitle(UiText.text(this, "읽기·음성 설정", "文字・音声設定", "Reading & voice"))
+        controls = MuseAlertDialogBuilder(this).setTitle(UiText.text(this, "읽기·음성 설정", "文字・音声設定", "Reading & voice"))
             .setItems(arrayOf(UiText.text(this, "글자 크기", "文字サイズ", "Text size"), UiText.text(this, "음성 속도", "音声速度", "Voice speed"))) { _, choice ->
                 val values = if(choice == 0) ReadingSettings.sizes else ReadingSettings.speeds
                 val current = if(choice == 0) ReadingSettings.size(this) else ReadingSettings.speed(this)
                 val labels = values.map { if(choice == 0) "${it.toInt()} sp" else "${it}×" }.toTypedArray()
-                controls = AlertDialog.Builder(this).setTitle(if(choice == 0) UiText.text(this,"글자 크기","文字サイズ","Text size") else UiText.text(this,"음성 속도","音声速度","Voice speed"))
+                controls = MuseAlertDialogBuilder(this).setTitle(if(choice == 0) UiText.text(this,"글자 크기","文字サイズ","Text size") else UiText.text(this,"음성 속도","音声速度","Voice speed"))
                     .setSingleChoiceItems(labels, values.indexOfFirst { it == current }) { d, index ->
                         getSharedPreferences("reading", MODE_PRIVATE).edit().putFloat(if(choice == 0) "size" else "speed", values[index]).apply()
                         if(choice == 0) { screen.refreshTextSize(); if(hasConversation) renderConversation() }
@@ -836,7 +863,7 @@ class MainActivity : Activity() {
     private fun chooseLanguage(target: Boolean) {
         if (store.elevenLabs() == null) { screen.showNotice("ElevenLabs 등록이 필요합니다."); return }
         val languages = InputLanguage.entries.filter { !target || it != InputLanguage.AUTO }
-        languageDialog = AlertDialog.Builder(this).setTitle(tr(if (target) "번역할 언어" else "말하는 언어"))
+        languageDialog = MuseAlertDialogBuilder(this).setTitle(tr(if (target) "번역할 언어" else "말하는 언어"))
             .setItems(languages.map { tr(it.label) }.toTypedArray()) { _, which ->
                 languageMode = if (target) languageMode.copy(target = languages[which]) else languageMode.copy(input = languages[which])
                 saveLanguageMode()
@@ -889,7 +916,7 @@ class MainActivity : Activity() {
     private fun confirmClearHistory() {
         if (!historyLoaded || !hasConversation || continuous || recording || sending ||
             controls?.isShowing == true || clearDialog?.isShowing == true) return
-        clearDialog = AlertDialog.Builder(this)
+        clearDialog = MuseAlertDialogBuilder(this)
             .setTitle(tr("Clear display history?"))
             .setMessage(tr("This clears only this r1's display history. Your conversation remains in Meta Muse, and Muse still remembers earlier turns."))
             .setNegativeButton(tr("Cancel"), null)
@@ -912,7 +939,7 @@ class MainActivity : Activity() {
     private fun showControls() {
         if (continuous || recording || controls?.isShowing == true || clearDialog?.isShowing == true) return
         val paired = store.credentials() != null
-        controls = AlertDialog.Builder(this)
+        controls = MuseAlertDialogBuilder(this)
             .setTitle(tr("Device controls"))
             .setItems(arrayOf(if (paired) "Reconnect to Muse" else "Pair with Muse", "Android settings",
                 "Return to idle", "Show conversation", "Side button settings",
@@ -950,12 +977,17 @@ class MainActivity : Activity() {
             if(!done){missionChunks[id]=full;return}
             missionDone.add(id);missionChunks.remove(id)
             val result=PetMission.parse(full)
-            missionReply=result?.reply ?: funText("사진을 판정하지 못했어요. 보상은 지급되지 않았어요. 다시 촬영해 주세요.","写真を判定できませんでした。報酬は付与されていません。もう一度撮ってね。","I couldn't verify the photo. No reward was granted. Please try another photo.")
+            missionReply=result?.reply ?: PetMission.unverifiedReply(full,mission.replyLanguage.code?:"ko")
             val seed=mission.petSeed
             if(result?.matched==true && seed!=null && !PetStore(this).load(System.currentTimeMillis()).let { it.seed!=seed || it.dead }) {
                 val granted=PetActivitiesStore(this).completeMission(seed,mission.petMissionToken.orEmpty())
                 if(granted)missionReply+="\n"+funText("미션 성공! 방 꾸미기에 새 장식이 생겼어요.","ミッション達成！お部屋に新しい飾りが増えたよ。","Mission complete! A new room decoration is available.")
             }
+        }
+        if(done && current===discoveryConversation)discoveryPhoto?.let {photo->
+            val seed=photo.petSeed;val token=photo.petDiscoveryToken
+            if(seed!=null && token!=null && PetStore(this).load(System.currentTimeMillis()).seed==seed)
+                runCatching {PetWorldStore(this).photoReply(seed,token,if(text.isNotBlank())text else current.replies.getOrDefault(id,""))}
         }
         val petAnswer = petDialogueTurn?.receive(id,text,done)
         if(petDialogueTurn!=null && petAnswer==null)return
@@ -984,7 +1016,7 @@ class MainActivity : Activity() {
         if(recording)finishRecording(false)
         if(clockDialog!=null){command?.let{clockPanel?.command(it)};return}
         speech.stop()
-        val d=android.app.Dialog(this,R.style.Theme_Muse)
+        val d=MuseDialog(this,R.style.Theme_Muse)
         val panel=ClockPanel(this){d.dismiss()}
         clockPanel=panel;clockDialog=d;d.setContentView(panel.view)
         d.setOnDismissListener{panel.pause();clockPanel=null;clockDialog=null;refreshClockStatus()}
@@ -1012,6 +1044,7 @@ class MainActivity : Activity() {
     private fun receiveTranscript(text: String) {
         val current = activeTurn ?: return
         current.user = text
+        petDialogueTurn?.setQuestion(text)
         transcriptPending = false
         transcriptFetch?.cancel()
         historyStore.save(history)
@@ -1368,7 +1401,7 @@ class MainActivity : Activity() {
             filters = arrayOf(android.text.InputFilter.LengthFilter(if(photo == null) 4000 else 1000))
             minLines = 2; maxLines = 4; textSize = 16f
         }
-        val dialog = AlertDialog.Builder(this)
+        val dialog = MuseAlertDialogBuilder(this)
             .setTitle(if (photo == null) UiText.text(this, "글로 대화", "文字で会話", "Type a message") else UiText.text(this, "사진에 이어 질문", "写真に続けて質問", "Follow up on photo"))
             .setMessage(if (photo != null) UiText.text(this, "같은 사진을 질문과 함께 Muse에 다시 보냅니다.", "同じ写真を質問と一緒にMuseへ再送します。", "The same photo will be sent to Muse again with your question.") else null)
             .setView(input)
@@ -1434,9 +1467,15 @@ class MainActivity : Activity() {
         if(petCameraReturned)return
         if (!connected || !historyLoaded || sending || recording || foreground !== this) return
         val request = PhotoQuestion.pending ?: return
-        PhotoQuestion.pending = null
         val current = connection ?: return
-        PhotoQuestion.last = request.copy(petSeed=null,petMissionToken=null,petMissionTarget=-1)
+        val discovery=request.takeIf {it.petSeed!=null && it.petDiscoveryToken!=null && it.petDiscoveryKind in 0..2}
+        if(discovery!=null) {
+            val saved=runCatching {PetStore(this).load(System.currentTimeMillis()).seed==discovery.petSeed && PetWorldStore(this).addPhoto(discovery.petSeed!!,discovery.petDiscoveryToken!!,discovery.petDiscoveryKind,discovery.jpeg,discovery.question)}.getOrDefault(false)
+            if(!saved){PhotoQuestion.pending=null;petRoom?.agentUpdate(funText("도감에 저장하지 못했어요. 공간을 확인하고 다시 촬영해 주세요.","図鑑に保存できませんでした。空きを確認して撮り直してね。","Couldn't save to the album. Check space and take another photo."),"",reveal=true);return}
+        }
+        PhotoQuestion.pending = null
+        discoveryPhoto=discovery;discoveryConversation=null
+        PhotoQuestion.last = request.copy(petSeed=null,petMissionToken=null,petMissionTarget=-1,petDiscoveryToken=null,petDiscoveryKind=-1)
         missionPhoto=request.takeIf { it.petSeed!=null && it.petMissionToken!=null && it.petMissionTarget in 0..2 };missionChunks.clear();missionDone.clear()
         speech.stop()
         activeLanguageMode = languageMode.copy(interpreting = true, target = request.replyLanguage)
@@ -1444,8 +1483,9 @@ class MainActivity : Activity() {
         replySpeechStopped=false
         activePetTurn=inPetMode
         petDialogueTurn=null;petDialogueRoom=null
-        activeTurn = ConversationTurn().also { it.user = "[사진] " + request.question; history.add(it) }
+        activeTurn = ConversationTurn().also { it.user = UiText.text(this, "[사진] ", "[写真] ", "[Photo] ") + request.question; history.add(it) }
         missionConversation=if(missionPhoto!=null)activeTurn else null
+        discoveryConversation=if(discoveryPhoto!=null)activeTurn else null
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "사진을 Muse에 전송 중", "写真をMuseに送信中", "Sending photo to Muse"))

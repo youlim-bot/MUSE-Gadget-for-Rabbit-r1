@@ -19,7 +19,7 @@ internal class MuseSettingsDialog(
     private val entries:List<Entry>,
     private val wifiSummary:()->String,
     private val museSummary:()->String
-):Dialog(context,R.style.Theme_Muse) {
+):MuseDialog(context,R.style.Theme_Muse) {
     data class Entry(val id:String,val title:String,val subtitle:String,val section:String,val action:()->Unit)
     private val handler=Handler(Looper.getMainLooper())
     private var wifiText:TextView?=null
@@ -34,7 +34,7 @@ internal class MuseSettingsDialog(
         window?.decorView?.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         val root=LinearLayout(context).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(6),dp(16),dp(8));setBackgroundColor(Color.rgb(10,11,10))}
         val head=LinearLayout(context).apply{gravity=Gravity.CENTER_VERTICAL}
-        head.addView(text(22f,Color.WHITE).apply{this.text=t("설정","設定","Settings");typeface=Typeface.DEFAULT_BOLD},LinearLayout.LayoutParams(0,-2,1f))
+        head.addView(text(22f,Color.WHITE).apply{this.text=t("설정","設定","Settings");typeface=Typeface.DEFAULT_BOLD;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(14,22,1,android.util.TypedValue.COMPLEX_UNIT_SP)},LinearLayout.LayoutParams(0,-2,1f))
         head.addView(Button(context).apply{text=t("닫기","閉じる","Close");isAllCaps=false;textSize=13f;setTextColor(orange);setPadding(0,0,0,0);minimumWidth=0;minWidth=0;setOnClickListener{dismiss()}},LinearLayout.LayoutParams(dp(64),dp(48)))
         root.addView(head,LinearLayout.LayoutParams(-1,dp(52)))
         val rows=LinearLayout(context).apply{orientation=LinearLayout.VERTICAL}

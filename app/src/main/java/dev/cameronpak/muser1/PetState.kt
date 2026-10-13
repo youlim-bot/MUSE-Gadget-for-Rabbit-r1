@@ -16,7 +16,9 @@ data class PetState(
     val meals: Int = 0, val fedAt: Long = 0L, val playedAt: Long = 0L,
     val washedAt: Long = 0L, val medicineAt: Long = 0L,
     val sleepMs: Long = 0L, val form: PetForm = PetForm.UNDECIDED,
-    val dead: Boolean = false, val diedAt: Long = 0L
+    val dead: Boolean = false, val diedAt: Long = 0L,
+    val startedAt: Long = updatedAt, val startEstimated: Boolean = false,
+    val wardrobe: PetWardrobeState = PetWardrobeState()
 ) {
     val hatchDuration: Long get() = 48 * HOUR + Math.floorMod(seed, 24 * HOUR)
     val hatchReady: Boolean get() = !hatched && incubationMs >= hatchDuration
@@ -45,7 +47,12 @@ data class PetState(
     /** Fixed five-minute steps preserve fractional time across saves and render ticks. */
     fun advance(now: Long): PetState {
         if(now <= updatedAt || dead) return this
-        if(!hatched) return copy(incubationMs=(incubationMs+(now-updatedAt)).coerceAtMost(hatchDuration),updatedAt=now)
+        if(!hatched) {
+            // Add only the remaining incubation, so a huge absence cannot overflow before capping.
+            val incubation=incubationMs.coerceIn(0,hatchDuration)
+            val remaining=hatchDuration-incubation
+            return copy(incubationMs=incubation+minOf(now-updatedAt,remaining),updatedAt=now)
+        }
         var s=this
         while(now-s.updatedAt >= STEP && !s.dead) {
             val h=STEP.toDouble()/HOUR
@@ -81,32 +88,44 @@ data class PetState(
         return copy(eggCare=(eggCare+1).coerceAtMost(1000),eggCareAt=now,
             warmth=(warmth+1).coerceAtMost(85.0),bond=(bond+1).coerceAtMost(100))
     }
+    private fun Int.incrementBounded():Int = if(this==Int.MAX_VALUE)this else this+1
+    private fun Double.addTrait(amount:Double):Double = (this+amount).coerceAtMost(MAX_TRAIT)
     fun agentInteraction(now: Long): PetState {
         val s=advance(now)
         if(s.dead)return s
         if(!s.hatched)return s.nurture(now)
         if(s.rewardAt!=0L && now-s.rewardAt<30*60_000L)return s
         return s.copy(mood=(s.mood+7).coerceAtMost(100.0),warmth=(s.warmth+4).coerceAtMost(100.0),
-            curiosity=s.curiosity+1,lonelyMs=0,rewardAt=now,bond=(s.bond+1).coerceAtMost(100))
+            curiosity=s.curiosity.addTrait(1.0),lonelyMs=0,rewardAt=now,bond=(s.bond+1).coerceAtMost(100))
     }
-    fun feed(meal:PetFood,now:Long):PetState {
+    fun feed(meal:PetFood,now:Long):PetState = feedResult(meal,now).state
+    /** Advance first; expose the actual refusal even when fedAt/counters have not changed. */
+    fun feedResult(meal:PetFood,now:Long):PetFeedResult {
         val s=advance(now)
-        if(!s.hatched || s.dead || s.sleeping || s.food>85 || (s.fedAt!=0L && now-s.fedAt<30*60_000L))return s
+        val refusal=when {
+            s.dead -> PetFeedRefusal.DEAD
+            !s.hatched -> PetFeedRefusal.EGG
+            s.sleeping -> PetFeedRefusal.SLEEPING
+            s.food>=FULL_THRESHOLD -> PetFeedRefusal.FULL
+            else -> null
+        }
+        if(refusal!=null)return PetFeedResult(s,refusal)
         val sweet=meal==PetFood.CAKE
-        return s.copy(food=(s.food+meal.fill).coerceAtMost(100.0),mood=(s.mood+if(sweet)12 else 3).coerceAtMost(100.0),
+        return PetFeedResult(PetWardrobe.reward(s.copy(food=(s.food+meal.fill).coerceAtMost(100.0),mood=(s.mood+if(sweet)12 else 3).coerceAtMost(100.0),
             health=(s.health+if(sweet)-5.0 else meal.health).coerceIn(1.0,100.0),
-            dietMask=s.dietMask or (1 shl meal.ordinal),meals=s.meals+1,sweets=s.sweets+if(sweet)1 else 0,
-            vigor=s.vigor+if(meal==PetFood.FISH || meal==PetFood.VEGETABLES)1 else 0,
-            warmth=(s.warmth+1).coerceAtMost(100.0),fedAt=now)
+            dietMask=s.dietMask or (1 shl meal.ordinal),meals=s.meals.incrementBounded(),sweets=if(sweet)s.sweets.incrementBounded() else s.sweets,
+            vigor=s.vigor.addTrait(if(meal==PetFood.FISH || meal==PetFood.VEGETABLES)1.0 else 0.0),
+            warmth=(s.warmth+1).coerceAtMost(100.0),fedAt=now),"bow",now))
     }
     fun play(game:PetGame,won:Boolean,now:Long):PetState {
         val s=advance(now)
         if(!s.hatched || s.dead || s.sleeping || s.energy<10 || (s.playedAt!=0L && now-s.playedAt<30*60_000L))return s
         val bonus=if(won)3.0 else 1.0
-        return s.copy(mood=(s.mood+if(won)20 else 8).coerceAtMost(100.0),energy=(s.energy-6).coerceAtLeast(0.0),
+        val played=s.copy(mood=(s.mood+if(won)20 else 8).coerceAtMost(100.0),energy=(s.energy-6).coerceAtLeast(0.0),
             warmth=(s.warmth+if(won)8 else 4).coerceAtMost(100.0),lonelyMs=0,playedAt=now,
-            curiosity=s.curiosity+if(game==PetGame.MEMORY)bonus else 0.0,
-            vigor=s.vigor+if(game!=PetGame.MEMORY)bonus else 0.0)
+            curiosity=s.curiosity.addTrait(if(game==PetGame.MEMORY)bonus else 0.0),
+            vigor=s.vigor.addTrait(if(game!=PetGame.MEMORY)bonus else 0.0))
+        return if(won)PetWardrobe.reward(played,if(game==PetGame.MEMORY)"glasses" else "raincoat",now)else played
     }
     fun medicine(now:Long):PetState {
         val s=advance(now)
@@ -122,7 +141,7 @@ data class PetState(
         return when(action) {
             PetAction.FEED -> s.feed(PetFood.PORRIDGE,now)
             PetAction.PLAY -> s.play(PetGame.STARS,true,now)
-            PetAction.CLEAN -> if(s.washedAt!=0L && now-s.washedAt<30*60_000L)s else s.copy(clean=100.0,washedAt=now)
+            PetAction.CLEAN -> if(s.washedAt!=0L && now-s.washedAt<30*60_000L)s else PetWardrobe.reward(s.copy(clean=100.0,washedAt=now),"scarf",now)
             else -> s
         }
     }
@@ -130,7 +149,13 @@ data class PetState(
         const val HOUR=3_600_000L
         const val DAY=24*HOUR
         const val STEP=300_000L
+        const val MAX_TRAIT=1_000_000_000.0
+        const val FULL_THRESHOLD=95.0
     }
+}
+enum class PetFeedRefusal { FULL, SLEEPING, EGG, DEAD }
+data class PetFeedResult(val state:PetState,val refusal:PetFeedRefusal?=null) {
+    val accepted:Boolean get()=refusal==null
 }
 enum class PetAction { FEED, PLAY, CLEAN, SLEEP }
 enum class PetFood(val fill:Double,val health:Double) {

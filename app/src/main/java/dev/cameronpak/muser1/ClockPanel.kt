@@ -29,7 +29,7 @@ internal class ClockPanel(private val host:Activity,private val close:()->Unit):
     private fun t(a:String,b:String,c:String)=UiText.text(this,a,b,c)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
     private fun label(s:String,size:Float=15f)=TextView(this).apply{text=s;textSize=size;setTextColor(Color.WHITE);setPadding(dp(8),dp(8),dp(8),dp(4))}
-    private fun button(s:String,action:()->Unit)=Button(this).apply{text=s;isAllCaps=false;textSize=13f;setTextColor(Color.rgb(255,163,55));background=GradientDrawable().apply{setColor(Color.rgb(30,32,30));cornerRadius=dp(14).toFloat()};setOnClickListener{runCatching{action()}.onFailure{AlertDialog.Builder(host).setMessage(t("설정하지 못했습니다. 권한과 시간을 확인해 주세요.","権限と時刻を確認してください。","Could not save. Check permissions and time.")).setPositiveButton("OK",null).show()}}}
+    private fun button(s:String,action:()->Unit)=Button(this).apply{text=s;isAllCaps=false;textSize=13f;setTextColor(Color.rgb(255,163,55));background=GradientDrawable().apply{setColor(Color.rgb(30,32,30));cornerRadius=dp(14).toFloat()};setOnClickListener{runCatching{action()}.onFailure{MuseAlertDialogBuilder(host).setMessage(t("설정하지 못했습니다. 권한과 시간을 확인해 주세요.","権限と時刻を確認してください。","Could not save. Check permissions and time.")).setPositiveButton("OK",null).show()}}}
     init {
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(10,13,11));setPadding(dp(12),dp(16),dp(12),dp(12))}
         root.addView(button(t("‹ 대화로","‹ 会話へ","‹ Conversation")){if(editing)showList()else close()},LinearLayout.LayoutParams(-1,dp(40)))
@@ -45,7 +45,7 @@ internal class ClockPanel(private val host:Activity,private val close:()->Unit):
     private fun permission():Boolean {
         if(BuildConfig.DEMO) { Toast.makeText(this,"OFFLINE DEMO · No alarms scheduled",Toast.LENGTH_SHORT).show();return false }
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){host.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),731);return false}
-        if(!LocalClock.exact(this)){AlertDialog.Builder(this).setMessage(t("정시에 울리려면 ‘알람 및 리마인더’ 권한을 허용한 뒤 다시 설정해 주세요.","正確なアラーム権限を許可してから設定してください。","Allow Alarms & reminders, then set the alarm again.")).setPositiveButton(t("설정 열기","設定","Open settings")){_,_->startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:$packageName")))}.setNegativeButton(t("취소","キャンセル","Cancel"),null).show();return false}
+        if(!LocalClock.exact(this)){MuseAlertDialogBuilder(this).setMessage(t("정시에 울리려면 ‘알람 및 리마인더’ 권한을 허용한 뒤 다시 설정해 주세요.","正確なアラーム権限を許可してから設定してください。","Allow Alarms & reminders, then set the alarm again.")).setPositiveButton(t("설정 열기","設定","Open settings")){_,_->startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:$packageName")))}.setNegativeButton(t("취소","キャンセル","Cancel"),null).show();return false}
         if(!getSystemService(NotificationManager::class.java).areNotificationsEnabled()){startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName));return false}
         return true
     }
@@ -64,7 +64,7 @@ internal class ClockPanel(private val host:Activity,private val close:()->Unit):
         content.addView(label(if(c.kind=="timer")t("타이머 · 분:초","タイマー・分:秒","Timer · min:sec")else t("알람 · R1에서 울립니다","アラーム・R1で鳴ります","Alarm · rings on R1"),13f))
         row(button(t("취소","キャンセル","Cancel")){showList()},button(t("시작","開始","Start")){save(c)})
     }
-    private fun help(){AlertDialog.Builder(this).setMessage(t("예: 3분 타이머 / 내일 오전 7시 알람 / 평일 오전 8시 알람\n1초~24시간 타이머. 날짜가 있는 일정은 리마인더 버튼에서 직접 설정하세요.","例：3分タイマー / 明日午前7時に起こして / 平日午前8時アラーム\nタイマーは1秒〜24時間。","Examples: timer for 3 minutes / wake me at 7 am tomorrow / weekday alarm at 8 am\nTimers: 1 second to 24 hours.")).setPositiveButton("OK",null).show()}
+    private fun help(){MuseAlertDialogBuilder(this).setMessage(t("예: 3분 타이머 / 내일 오전 7시 알람 / 평일 오전 8시 알람\n1초~24시간 타이머. 날짜가 있는 일정은 리마인더 버튼에서 직접 설정하세요.","例：3分タイマー / 明日午前7時に起こして / 平日午前8時アラーム\nタイマーは1秒〜24時間。","Examples: timer for 3 minutes / wake me at 7 am tomorrow / weekday alarm at 8 am\nTimers: 1 second to 24 hours.")).setPositiveButton("OK",null).show()}
     private fun picker(maximum:Int,initial:Int)=NumberPicker(this).apply{
         minValue=0;maxValue=maximum;value=initial;wrapSelectorWheel=true
         descendantFocusability=android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS

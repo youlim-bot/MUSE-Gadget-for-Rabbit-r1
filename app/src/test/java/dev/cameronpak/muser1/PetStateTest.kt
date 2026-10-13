@@ -36,7 +36,27 @@ class PetStateTest {
         assertTrue(fish.food>cake.food);assertTrue(fish.health>cake.health)
         assertTrue(cake.mood>fish.mood);assertEquals(1,cake.sweets)
         assertEquals(2,Integer.bitCount(fish.feed(PetFood.VEGETABLES,now+h).dietMask))
-        assertEquals(1,fish.feed(PetFood.FISH,now+1000).meals)
+        assertEquals(2,fish.feed(PetFood.FISH,now+1000).meals)
+    }
+    @Test fun feedingAcceptsNotFullNeedsWithoutCooldownAndCareUsesSameRule() {
+        for(food in listOf(70.0,85.1,94.999)) {
+            val hungry=baby().copy(food=food,fedAt=now)
+            assertEquals(1,hungry.feed(PetFood.MILK,now).meals)
+            assertEquals(1,hungry.care(PetAction.FEED,now).meals)
+        }
+        for(food in listOf(95.0,100.0)) {
+            val full=baby().copy(food=food)
+            assertEquals(full,full.feed(PetFood.CAKE,now))
+            assertEquals(full,full.care(PetAction.FEED,now))
+        }
+    }
+    @Test fun repeatedCakeAtSameTimeStopsAtFullAndGrantsBowOnlyOnce() {
+        var s=baby().copy(food=0.0,health=100.0)
+        repeat(1000){s=s.feed(PetFood.CAKE,now)}
+        assertEquals(96.0,s.food,0.0);assertEquals(8,s.meals);assertEquals(8,s.sweets)
+        assertEquals(60.0,s.health,0.0);assertEquals(now,s.wardrobe.unlocked["bow"])
+        val refused=s.feed(PetFood.FISH,now+1)
+        assertEquals(s,refused)
     }
     @Test fun neglectChangesPersonalityAndPatientCareCanRecoverIt() {
         val lonely=baby().advance(now+49*h)

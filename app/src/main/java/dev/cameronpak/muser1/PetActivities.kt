@@ -16,14 +16,20 @@ internal class PetActivities(private val host:MainActivity,private val state:()-
     private val store=PetActivitiesStore(host)
     private var dialog:Dialog?=null
     private var picker:Dialog?=null
+    internal var pageKeys:((KeyEvent)->Boolean)?=null
+    private var sideDown=-1L
+    private var volumeOwned=false
+    private val world by lazy { PetWorldActivities(this,host,state,changed) }
+    internal val focused get()=dialog?.window?.decorView?.hasWindowFocus()==true
     private val ink=0xff303831.toInt()
     private val green=0xff4d6e4c.toInt()
     private fun dp(n:Int)=(n*host.resources.displayMetrics.density).toInt()
     private fun t(k:String,j:String,e:String)=UiText.text(host,k,j,e)
-    fun close(){picker?.dismiss();picker=null;dialog?.dismiss();dialog=null}
-    private fun page(title:String,build:(LinearLayout)->Unit) {
+    fun close(){picker?.dismiss();picker=null;dialog?.dismiss();dialog=null;if(foreground===this)foreground=null}
+    internal fun page(title:String,onClose:()->Unit={},build:(LinearLayout)->Unit) {
         dialog?.dismiss();host.petStopSpeech()
-        val d=Dialog(host,R.style.Theme_Muse);dialog=d
+        pageKeys=null;sideDown=-1;volumeOwned=false
+        val d=MuseDialog(host,R.style.Theme_Muse);dialog=d
         val root=LinearLayout(host).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(8),dp(12),dp(8));setBackgroundColor(0xfff6f1df.toInt()) }
         val header=LinearLayout(host).apply { gravity=Gravity.CENTER_VERTICAL }
         header.addView(TextView(host).apply { text=title;textSize=18f;setTextColor(ink);typeface=Typeface.DEFAULT_BOLD;maxLines=2 },LinearLayout.LayoutParams(0,dp(56),1f))
@@ -33,21 +39,53 @@ internal class PetActivities(private val host:MainActivity,private val state:()-
         root.addView(ScrollView(host).apply { isFillViewport=true;addView(content) },LinearLayout.LayoutParams(-1,0,1f))
         build(content)
         if(title!=t("특별 활동","特別な活動","Special activities"))button(root,t("‹ 특별 활동","‹ 特別な活動","‹ Special activities")){show()}
-        d.setContentView(root);d.show();d.window?.apply { setLayout(-1,-1);decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY }
+        d.setOnDismissListener {onClose();if(dialog===d){pageKeys=null;sideDown=-1;if(foreground===this)foreground=null}}
+        d.setOnKeyListener {_,_,event->key(event)}
+        d.setContentView(root);d.show();foreground=this;d.window?.apply { setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));setLayout(-1,-1);decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;decorView.post {if(d.isShowing)setLayout(-1,-1)} }
     }
-    private fun text(parent:LinearLayout,value:String,size:Float=14f) {
+    internal fun text(parent:LinearLayout,value:String,size:Float=14f) {
         parent.addView(TextView(host).apply { text=value;textSize=size;setTextColor(ink);setPadding(dp(8),dp(8),dp(8),dp(12));setLineSpacing(dp(3).toFloat(),1f) },LinearLayout.LayoutParams(-1,-2))
     }
-    private fun button(parent:LinearLayout,label:String,enabled:Boolean=true,action:()->Unit){
+    internal fun button(parent:LinearLayout,label:String,enabled:Boolean=true,action:()->Unit){
         parent.addView(Button(host).apply { text=label;isAllCaps=false;textSize=14f;setTextColor(Color.WHITE);minHeight=dp(52);setPadding(dp(12),dp(8),dp(12),dp(8));isEnabled=enabled;alpha=if(enabled)1f else .45f
             background=GradientDrawable().apply { setColor(green);cornerRadius=dp(12).toFloat() };setOnClickListener { action() }
         },LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(8) })
     }
-    private fun ask(question:String){close();host.petType(question)}
+    internal fun ask(question:String){close();host.petType(question)}
+    internal fun cancelKeys(){sideDown=-1;volumeOwned=false}
+    internal fun key(event:KeyEvent):Boolean {
+        if(!focused)return false
+        if(event.keyCode==KeyEvent.KEYCODE_PAIRING) {
+            if(event.action==KeyEvent.ACTION_DOWN && event.repeatCount==0){sideDown=event.downTime;volumeOwned=false}
+            if(event.action==KeyEvent.ACTION_UP && sideDown==event.downTime) {
+                sideDown=-1
+                if(!volumeOwned && !event.isCanceled) {
+                    val press=KeyEvent(event.downTime,event.eventTime,KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DPAD_CENTER,0)
+                    if(pageKeys?.invoke(press)!=true)(dialog?.window?.decorView?.findFocus() as? Button)?.performClick()
+                }
+            };return true
+        }
+        if(event.keyCode in intArrayOf(KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN) && sideDown>=0) {
+            if(event.action==KeyEvent.ACTION_DOWN){volumeOwned=true;host.adjustMediaVolume(if(event.keyCode==KeyEvent.KEYCODE_DPAD_UP)1 else -1)}
+            return true
+        }
+        return pageKeys?.invoke(event)==true
+    }
+    internal fun garden()=world.garden()
+    internal fun wheelGames()=world.games()
+    internal fun training()=world.training()
+    internal fun discoveries()=world.discoveries()
+    internal fun story()=world.story()
     fun show(){
         store.welcome(state().seed)
         page(t("특별 활동","特別な活動","Special activities")){v->
             text(v,t("함께 쌓아가는 우리만의 이야기","いっしょに紡ぐ、ふたりの物語","A little world we build together"))
+            button(v,PetWardrobeText.title(host)){close();PetRoom.foreground?.showWardrobe()}
+            button(v,t("작은 정원","小さな庭","Little garden")){garden()}
+            button(v,t("휠 미니게임","ホイールゲーム","Wheel minigames")){wheelGames()}
+            button(v,t("기술 가르치기","技を教える","Teach a trick")){training()}
+            button(v,t("사진 발견 도감","写真の発見図鑑","Photo discoveries")){discoveries()}
+            button(v,t("선택형 이야기","選んで進む物語","Choose our story")){story()}
             button(v,t("탐험 보내기","探検に送り出す","Solo exploration")){explore()}
             button(v,t("뮤즈의 일기","Museの日記","Muse's diary")){diary()}
             button(v,t("추억 상자","思い出の箱","Memory chest")){memories()}
@@ -181,4 +219,5 @@ internal class PetActivities(private val host:MainActivity,private val state:()-
             button(v,t("약속 삭제","約束を削除","Delete promise")){PetPromises.remove(host,p.id);changed();promises()}
         }
     }
+    companion object {internal var foreground:PetActivities?=null;private set}
 }

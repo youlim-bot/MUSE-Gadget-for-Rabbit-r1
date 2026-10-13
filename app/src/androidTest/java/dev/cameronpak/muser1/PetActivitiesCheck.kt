@@ -69,7 +69,7 @@ internal object PetActivitiesCheck {
                 capture(lang.name.lowercase())
                 ui {
                     val labels=descendants(dialog().window!!.decorView).filterIsInstance<Button>().map { it.text.toString() }
-                    check(labels.size==7){"Expected six activities and close"}
+                    check(labels.size==12){"Expected eleven activities and close"}
                     check(labels.none { it in listOf("Feed","Play","Care","먹이","놀이","돌봄") })
                     controller!!.explore()
                 };capture("explore-${lang.name.lowercase()}")

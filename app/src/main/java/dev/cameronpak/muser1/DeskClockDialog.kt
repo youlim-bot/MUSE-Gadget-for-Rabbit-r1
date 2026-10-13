@@ -13,7 +13,7 @@ import kotlinx.coroutines.*
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-internal class DeskClockDialog(host: Activity, private val battery: () -> Int, onClose: () -> Unit) : Dialog(host, R.style.Theme_Muse) {
+internal class DeskClockDialog(host: Activity, private val battery: () -> Int, onClose: () -> Unit) : MuseDialog(host, R.style.Theme_Muse) {
     private val weatherScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val weather = TextView(host).apply { textSize=17f; setTextColor(Color.WHITE); gravity=Gravity.CENTER }
     private val metrics = TextView(host).apply { textSize=14f; setTextColor(Color.LTGRAY); gravity=Gravity.CENTER; visibility=android.view.View.GONE }

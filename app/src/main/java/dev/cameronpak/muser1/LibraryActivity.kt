@@ -15,7 +15,7 @@ import kotlinx.coroutines.*
 import java.util.UUID
 
 /** Local saved copies and text memos. Explicit transcription sends audio to ElevenLabs; task extraction sends memo text to Muse. */
-class LibraryActivity : Activity() {
+class LibraryActivity : MuseActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var storage: LibraryStore
     private var saved = listOf<SavedItem>()
@@ -101,7 +101,7 @@ class LibraryActivity : Activity() {
         if(item.kind == "todo") { showChecklist(item.id); return }
         val body=TextView(this).apply { text=if(item.kind=="memo") item.text else item.title+"\n\n"+item.text; textSize=16f; setPadding(dp(18),dp(10),dp(18),dp(10)); setTextIsSelectable(true) }
         val exists=saved.any { it.id==item.id }
-        val builder=AlertDialog.Builder(this).setTitle(if(item.kind=="memo") t("메모", "メモ", "Memo") else t("대화", "会話", "Conversation"))
+        val builder=MuseAlertDialogBuilder(this).setTitle(if(item.kind=="memo") t("메모", "メモ", "Memo") else t("대화", "会話", "Conversation"))
             .setView(ScrollView(this).apply { addView(body) }).setNegativeButton(t("닫기", "閉じる", "Close"),null)
         if(item.kind=="memo") {
             builder.setPositiveButton(t("수정", "編集", "Edit")) { _,_-> editMemo(item) }
@@ -114,7 +114,7 @@ class LibraryActivity : Activity() {
     }
     private fun editMemo(item: SavedItem) {
         val input=EditText(this).apply { setText(item.text); minLines=3; maxLines=7; filters=arrayOf(android.text.InputFilter.LengthFilter(8000)) }
-        val d=AlertDialog.Builder(this).setTitle(t("메모 확인·수정", "メモを確認・編集", "Review memo"))
+        val d=MuseAlertDialogBuilder(this).setTitle(t("메모 확인·수정", "メモを確認・編集", "Review memo"))
             .setView(input).setNeutralButton(t("삭제", "削除", "Delete")) { _,_-> confirmDelete(item.id) }
             .setNegativeButton(t("취소", "キャンセル", "Cancel"),null).setPositiveButton(t("저장", "保存", "Save"),null).create()
         d.setOnShowListener { d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -124,7 +124,7 @@ class LibraryActivity : Activity() {
         } }; dialog=d; d.show()
     }
     private fun confirmDelete(id: String) {
-        dialog=AlertDialog.Builder(this).setMessage(t("이 항목을 삭제할까요?", "この項目を削除しますか？", "Delete this item?"))
+        dialog=MuseAlertDialogBuilder(this).setMessage(t("이 항목을 삭제할까요?", "この項目を削除しますか？", "Delete this item?"))
             .setNegativeButton(t("취소", "キャンセル", "Cancel"),null)
             .setPositiveButton(t("삭제", "削除", "Delete")) { _,_->commit(saved.filterNot { it.id==id }) }.show()
     }
@@ -142,7 +142,7 @@ class LibraryActivity : Activity() {
                 }
             })
         }
-        dialog=AlertDialog.Builder(this).setTitle(t("할 일 목록", "タスクリスト", "To-do list"))
+        dialog=MuseAlertDialogBuilder(this).setTitle(t("할 일 목록", "タスクリスト", "To-do list"))
             .setView(ScrollView(this).apply { addView(box) })
             .setNegativeButton(t("닫기", "閉じる", "Close"),null)
             .setNeutralButton(t("삭제", "削除", "Delete")) { _,_->confirmDelete(id) }.show()
@@ -151,7 +151,7 @@ class LibraryActivity : Activity() {
         if(taskJob?.isActive==true || memoJob?.isActive==true) return
         val app=application as MuseApp
         val credentials=app.store.credentials() ?: return
-        dialog=AlertDialog.Builder(this).setTitle(t("메모를 할 일로 정리", "メモをタスクに整理", "Turn memo into tasks"))
+        dialog=MuseAlertDialogBuilder(this).setTitle(t("메모를 할 일로 정리", "メモをタスクに整理", "Turn memo into tasks"))
             .setMessage(t("이 메모를 Muse에 보내 할 일을 추립니다. 결과를 수정한 뒤 별도 목록으로 저장합니다.", "メモをMuseに送りタスクを抽出します。確認後、別のリストに保存します。", "Send this memo to Muse to extract tasks. Review before saving a separate list."))
             .setNegativeButton(t("취소", "キャンセル", "Cancel"),null)
             .setPositiveButton(t("정리하기", "整理する", "Extract tasks")) { _,_->
@@ -173,7 +173,7 @@ class LibraryActivity : Activity() {
                         val tasks=TodoDraft.parse(text)
                         if(tasks.isEmpty()) { state.text=t("메모에서 할 일을 찾지 못했습니다.", "タスクが見つかりませんでした。", "No actionable tasks found."); return@launch }
                         val input=EditText(this@LibraryActivity).apply { setText(tasks.joinToString("\n")); minLines=3; maxLines=7; filters=arrayOf(android.text.InputFilter.LengthFilter(8000)) }
-                        val d=AlertDialog.Builder(this@LibraryActivity).setTitle(t("한 줄에 할 일 하나", "1行に1つのタスク", "One task per line"))
+                        val d=MuseAlertDialogBuilder(this@LibraryActivity).setTitle(t("한 줄에 할 일 하나", "1行に1つのタスク", "One task per line"))
                             .setView(input).setNegativeButton(t("취소", "キャンセル", "Cancel"),null).setPositiveButton(t("목록 저장", "リスト保存", "Save list"),null).create()
                         d.setOnShowListener { d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                             val lines=input.text.toString().lines().map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -194,7 +194,7 @@ class LibraryActivity : Activity() {
         if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),7); return }
         val config=(application as MuseApp).store.elevenLabs()
         if(config==null) { Toast.makeText(this,t("ElevenLabs 등록이 필요합니다", "ElevenLabsの設定が必要です", "Configure ElevenLabs first"),Toast.LENGTH_LONG).show(); return }
-        val d=AlertDialog.Builder(this).setTitle(t("음성 메모 · 최대 20초", "音声メモ · 最大20秒", "Voice memo · up to 20s"))
+        val d=MuseAlertDialogBuilder(this).setTitle(t("음성 메모 · 최대 20초", "音声メモ · 最大20秒", "Voice memo · up to 20s"))
             .setMessage(t("녹음 후 ElevenLabs로 글자를 변환합니다. 확인 후 기기에 저장하며 Muse에는 보내지 않습니다.", "音声はElevenLabsで文字に変換します。確認後に端末へ保存し、Museには送りません。", "ElevenLabs transcribes the audio. Review and save text locally; nothing is sent to Muse."))
             .setNegativeButton(t("취소", "キャンセル", "Cancel"),null).setPositiveButton(t("녹음 시작", "録音開始", "Record"),null).create()
         fun finishCapture() {

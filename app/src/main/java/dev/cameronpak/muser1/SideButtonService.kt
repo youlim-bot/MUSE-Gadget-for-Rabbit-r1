@@ -31,7 +31,7 @@ class SideButtonService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             // Reject the rest of a wake/unlock press, including repeated downs and orphaned ups.
             acceptAfter = SystemClock.uptimeMillis()
-            PetRoom.foreground?.cancelAgentInput()
+            PetActivities.foreground?.cancelKeys();PetRoom.foreground?.cancelAgentInput()
             cancelGesture()
         }
     }
@@ -51,6 +51,12 @@ class SideButtonService : AccessibilityService() {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        val page=PetActivities.foreground
+        if(page!=null && page.focused && event.keyCode in intArrayOf(KeyEvent.KEYCODE_PAIRING,KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN)) {
+            cancelGesture()
+            if(power.isInteractive && !locked && event.downTime>acceptAfter)return page.key(event)
+            return true
+        }
         val pet = PetRoom.foreground
         if (pet != null && pet.hasWindowFocus() && event.keyCode in intArrayOf(KeyEvent.KEYCODE_PAIRING, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) {
             cancelGesture()
@@ -150,15 +156,15 @@ class SideButtonService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
-    override fun onInterrupt() { PetRoom.foreground?.cancelAgentInput();cancelGesture() }
+    override fun onInterrupt() { PetActivities.foreground?.cancelKeys();PetRoom.foreground?.cancelAgentInput();cancelGesture() }
     override fun onUnbind(intent: Intent?): Boolean {
-        PetRoom.foreground?.cancelAgentInput()
+        PetActivities.foreground?.cancelKeys();PetRoom.foreground?.cancelAgentInput()
         cancelGesture()
         if (instance === this) instance = null
         return super.onUnbind(intent)
     }
     override fun onDestroy() {
-        PetRoom.foreground?.cancelAgentInput()
+        PetActivities.foreground?.cancelKeys();PetRoom.foreground?.cancelAgentInput()
         cancelGesture()
         if (instance === this) instance = null
         unregisterReceiver(screenChanges)

@@ -6,7 +6,7 @@ import android.view.View
 import android.view.WindowManager
 
 /** Muse-owned lock-screen host; shares every control with the conversation panel. */
-class ClockActivity:Activity(){
+class ClockActivity:MuseActivity(){
     private lateinit var panel:ClockPanel
     override fun onCreate(state:Bundle?){
         super.onCreate(state);setShowWhenLocked(true);setTurnScreenOn(true)

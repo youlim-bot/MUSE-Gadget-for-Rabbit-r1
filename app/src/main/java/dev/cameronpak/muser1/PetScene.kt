@@ -7,7 +7,7 @@ import android.os.SystemClock
 import android.view.View
 import kotlin.math.*
 
-/** Custom Muse-generated dolphin with a deforming body, blink poses, movement and procedural egg animation. */
+/** Growth-stage plush sprites with a deforming body, blink poses, movement and procedural egg animation. */
 internal class PetScene(context:Context):View(context) {
     var pet=PetState(updatedAt=0); set(value){field=value;invalidate()}
     var decoration=-1; set(value){if(field!=value){field=value;invalidate()}}
@@ -19,7 +19,8 @@ internal class PetScene(context:Context):View(context) {
     private var reactionStarted=0L
     internal var previewTime:Long?=null
     private val brush=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val avatar=BitmapFactory.decodeResource(resources,R.drawable.muse_dolphin)
+    private val art=PetArt(resources)
+    private val wardrobeArt=PetWardrobeArt(resources)
     private val vertices=FloatArray(13*13*2)
     private val shape=Path()
     fun react(name:String){reaction=name;lastExpression=name;reactionStarted=SystemClock.elapsedRealtime();invalidate()}
@@ -70,7 +71,7 @@ internal class PetScene(context:Context):View(context) {
         }
         else if(pet.dead) {
             brush.color=0xfff4e3b7.toInt();c.drawCircle(180f,rh*.46f,42f,brush)
-            brush.alpha=170;c.drawBitmap(avatar,null,RectF(148f,rh*.46f-32f,212f,rh*.46f+32f),brush);brush.alpha=255
+            brush.alpha=170;c.drawBitmap(art.sprite(pet.level).bitmap,null,RectF(148f,rh*.46f-32f,212f,rh*.46f+32f),brush);brush.alpha=255
             text(c,"✦",180f,rh*.46f-48f,28f,0xffb99b59.toInt())
             text(c,"❀",180f,rh*.85f,30f,0xffb68d88.toInt())
         }
@@ -113,9 +114,8 @@ internal class PetScene(context:Context):View(context) {
         val shake=if(animated)sin(t*(if(hatch>0)30 else if(touched)10 else 4)).toFloat()*(if(hatch>0)12f else if(touched)7f else if(pet.eggCare>0)5f else 2f) else 0f
         brush.color=0x25907d58;c.drawOval(143f,bottom-8,217f,bottom+8,brush)
         c.save();c.translate(180f,bottom);c.rotate(shake);c.scale(h/112f,h/112f)
-        shape.reset();shape.moveTo(0f,-112f);shape.cubicTo(-27f,-112f,-46f,-55f,-43f,-27f);shape.cubicTo(-39f,13f,39f,13f,43f,-27f);shape.cubicTo(46f,-55f,27f,-112f,0f,-112f)
-        brush.color=Color.WHITE;brush.shader=LinearGradient(-40f,-100f,40f,0f,0xfffff8e6.toInt(),0xffdfd2ac.toInt(),Shader.TileMode.CLAMP);c.drawPath(shape,brush);brush.shader=null
-        brush.color=0xffa4b284.toInt();c.drawOval(-27f,-74f,-9f,-53f,brush);c.drawOval(11f,-47f,29f,-30f,brush);c.drawOval(-15f,-26f,-3f,-13f,brush);c.drawOval(5f,-94f,15f,-84f,brush)
+        val sprite=art.sprite(0).bitmap;val w=112f*sprite.width/sprite.height
+        brush.color=Color.WHITE;c.drawBitmap(sprite,null,RectF(-w/2,-112f,w/2,0f),brush)
         if(hatch>0) {
             brush.color=0xff9b8c6a.toInt();brush.style=Paint.Style.STROKE;brush.strokeWidth=2.5f;brush.strokeJoin=Paint.Join.ROUND
             shape.reset();shape.moveTo(-22f,-60f);shape.lineTo(-10f,-66f);shape.lineTo(-2f,-50f);shape.lineTo(10f,-62f);shape.lineTo(27f,-54f);c.drawPath(shape,brush);brush.style=Paint.Style.FILL
@@ -128,36 +128,41 @@ internal class PetScene(context:Context):View(context) {
         val tempo=if(quiet).55 else if(s.temperament==PetTemperament.PLAYFUL)1.18 else 1.0
         val base=PetMotion.pose((ms*tempo).toLong(),s.level,s.sleeping,effect,age,animated)
         val pose=if(quiet)base.copy(x=base.x*.3f,y=base.y*.5f,angle=base.angle*.4f)else base
-        val size=minOf(184f,rh*.86f)*when(s.level){1->.74f;2->.87f;3->.96f;else->1f}
+        val size=minOf(184f,rh*.86f)*(if(PetWardrobe.visible(s).any {it.slot==PetWardrobeSlot.HEAD}).82f else 1f)*when(s.level){1->.74f;2->.79f;3->.87f;5->.94f;else->1f}
+        val sprite=art.sprite(s.level)
+        val width=size*sprite.bitmap.width/sprite.bitmap.height
         val floor=rh*.92f
         brush.color=0x25907d58;c.drawOval(180+pose.x-size*.32f,floor-10,180+pose.x+size*.32f,floor+2,brush)
-        c.save();c.translate(180+pose.x,floor+pose.y);c.rotate(pose.angle);c.scale(pose.sx,pose.sy);c.translate(-size/2,-size)
+        c.save();c.translate(180+pose.x,floor+pose.y);c.rotate(pose.angle);c.scale(pose.sx,pose.sy);c.translate(-width/2,-size)
         // A light body deformation gives the plush independent movement, instead of sliding a rigid image.
         var p=0
         for(y in 0..12)for(x in 0..12) {
             val u=x/12f;val v=y/12f
             val sway=if(animated)sin(ms/230.0+v*3).toFloat()*size*.009f*(v-.2f).coerceAtLeast(0f) else 0f
-            vertices[p++]=u*size+sway;vertices[p++]=v*size
+            vertices[p++]=u*width+sway;vertices[p++]=v*size
         }
-        brush.color=Color.WHITE;brush.alpha=(alpha*255).toInt();c.drawBitmapMesh(avatar,12,12,vertices,0,null,0,brush);brush.alpha=255
+        brush.color=Color.WHITE;brush.alpha=(alpha*255).toInt();c.drawBitmapMesh(sprite.bitmap,12,12,vertices,0,null,0,brush);brush.alpha=255
         if(pose.blink) {
-            // Eye positions follow this fork's dolphin asset, not the old upstream character.
-            for((x,y) in listOf(.450f to .362f,.686f to .377f)) {
-                brush.color=0xffedb5bb.toInt();c.drawOval((x-.020f)*size,(y-.021f)*size,(x+.020f)*size,(y+.021f)*size,brush)
-                brush.color=0xff65434a.toInt();brush.style=Paint.Style.STROKE;brush.strokeWidth=maxOf(1.1f,size*.007f)
-                c.drawArc((x-.014f)*size,(y-.008f)*size,(x+.014f)*size,(y+.008f)*size,5f,170f,false,brush);brush.style=Paint.Style.FILL
+            sprite.eyes.forEach {eye->
+                val r=RectF(eye.left*width,eye.top*size,eye.right*width,eye.bottom*size)
+                r.inset(-width*.012f,-size*.008f)
+                brush.color=sprite.skin;c.drawOval(r,brush)
+                brush.color=0xff443629.toInt();brush.style=Paint.Style.STROKE;brush.strokeWidth=maxOf(1.3f,size*.009f)
+                r.inset(width*.009f,size*.008f);c.drawArc(r,8f,164f,false,brush);brush.style=Paint.Style.FILL
             }
         }
-        if(s.level>=2) { // Stage accessories retain the dolphin silhouette.
-            brush.color=when(s.form){PetForm.COMPANION->0xffc78c9a.toInt();PetForm.EXPLORER->0xff72a597.toInt();PetForm.SPRINTER->0xffd69759.toInt();PetForm.DREAMER->0xffa397bf.toInt();PetForm.WILD->0xff78899c.toInt();else->0xff8fae96.toInt()};c.drawRoundRect(size*.30f,size*.66f,size*.69f,size*.71f,4f,4f,brush)
-            text(c,if(s.level>=3)"✦" else "·",size*.61f,size*.71f,size*.11f,0xffffebaf.toInt())
+        if(s.level>=2 && s.level!=4) { // Adult uses the unadorned original Muse body.
+            val chest=when(s.level){2->.79f;3->.67f;else->.69f}
+            brush.color=when(s.form){PetForm.COMPANION->0xffc78c9a.toInt();PetForm.EXPLORER->0xff72a597.toInt();PetForm.SPRINTER->0xffd69759.toInt();PetForm.DREAMER->0xffa397bf.toInt();PetForm.WILD->0xff78899c.toInt();else->0xff8fae96.toInt()};c.drawRoundRect(width*.30f,size*chest,width*.69f,size*(chest+.05f),4f,4f,brush)
+            text(c,if(s.level>=3)"✦" else "·",width*.61f,size*(chest+.05f),size*.11f,0xffffebaf.toInt())
         }
-        if(s.level>=4) {
+        if(s.level>=4 && (s.level!=4 || s.form!=PetForm.UNDECIDED)) {
             val emblem=when(s.form){PetForm.COMPANION->"♥";PetForm.EXPLORER->"✧";PetForm.SPRINTER->"★";PetForm.DREAMER->"☾";PetForm.WILD->"ϟ";else->"·"}
-            text(c,emblem,size*.5f,size*.17f,size*.18f,0xffbd943c.toInt())
+            text(c,emblem,width*(if(s.level==4)1.02f else .5f),size*(if(s.level==4).27f else .17f),size*.18f,0xffbd943c.toInt())
         }
-        if(s.ill)text(c,"…",size*.79f,size*.4f,size*.15f,0xff6c8496.toInt())
-        else if(s.temperament==PetTemperament.GRUMPY)text(c,"﹏",size*.81f,size*.31f,size*.18f,0xff6c8496.toInt())
+        wardrobeArt.draw(c,s,sprite,width,size,vertices,brush,ms,animated,alpha)
+        if(s.ill)text(c,"…",width*.79f,size*.4f,size*.15f,0xff6c8496.toInt())
+        else if(s.temperament==PetTemperament.GRUMPY)text(c,"﹏",width*.81f,size*.31f,size*.18f,0xff6c8496.toInt())
         c.restore()
         if(s.sleeping) {
             rect(c,180-size*.55f,floor-size*.27f,180+size*.55f,floor,0xff8995b5.toInt(),12f)

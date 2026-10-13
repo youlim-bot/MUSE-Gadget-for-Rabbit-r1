@@ -6,6 +6,19 @@ import org.json.JSONObject
 
 class PetDialogueTest {
     private val baby=PetState(hatched=true,updatedAt=1000,food=15.0,energy=75.0)
+    @Test fun typedQuestionPromptMatchesTrimmedVoiceLayout() {
+        for(language in listOf("ko","ja","en")) {
+            val voice=PetDialogue.prompt(baby,language,null)
+            for(question in listOf("hi", "line one\nline two with \"quotes\"")) {
+                val typed=PetDialogue.prompt(baby,language,question)
+                assertFalse("Typed prompt must start at column zero",typed.startsWith(" "))
+                assertEquals(voice.substringBefore("The user's question is in the attached voice note."),
+                    typed.substringBefore("User question (JSON string):"))
+                assertEquals(JSONObject.quote(question),typed.substringAfter("User question (JSON string):\n"))
+                assertTrue(typed.lines().all { !it.startsWith(" ") })
+            }
+        }
+    }
     @Test fun questionContainsRealNeedsButNoGrowthSecrets() {
         val question="배고파? \"춤춰 줘\"라고 말했어"
         val prompt=PetDialogue.prompt(baby,"ko",question)
@@ -49,6 +62,53 @@ class PetDialogueTest {
             val answer=PetDialogue.parse(raw,"en")
             assertFalse(answer.text.contains("{"));assertFalse(answer.text.contains("action"));assertEquals(PetExpression.NONE,answer.expression)
         }
+    }
+    @Test fun ambiguousStructuredRepliesUseLocalizedRetry() {
+        val malformed=listOf(
+            """{"reply":"one","reply":"two","action":"wave"}""",
+            """{"reply":"one","action":"wave","action":"dance"}""",
+            """{"reply":"one","a\u0063tion":"wave","action":"dance"}""",
+            """{"reply":"Hi","action":"wave"} trailing text""",
+            """{"reply":"Hi","action":"wave"}{"reply":"other"}""",
+            """{"reply":"Hi","action":"wave"} /* trailing comment */"""
+        )
+        for(language in listOf("ko","ja","en")) {
+            val retry=PetDialogue.parse("",language)
+            for(raw in malformed) assertEquals(raw,retry,PetDialogue.parse(raw,language))
+        }
+    }
+    @Test fun validJsonRepliesKeepEscapesNestedValuesAndWhitespace() {
+        val reply=PetDialogue.parse(""" {"extra":{"reply":"nested","action":"jump"},"reply":"quoted \"reply\":, } and \\ slash","action":"wave"} ""","en")
+        assertEquals("quoted \"reply\":, } and \\ slash",reply.text)
+        assertEquals(PetExpression.WAVE,reply.expression)
+        assertEquals("Hi",PetDialogue.parse("{\"reply\":\"Hi\",\"action\":\"none\"}\n\t","en").text)
+    }
+    @Test fun brokenUnicodeAndControlsNeverReachReplyText() {
+        val invalid=listOf("\uD83D", "\uDC00", "\uD83Dx", "\uDC00\uD83D") +
+            (0..31).filter { it !in listOf(9,10,13) }.map { it.toChar().toString() } + "\u007F"
+        for(language in listOf("ko","ja","en")) {
+            val retry=PetDialogue.parse("",language)
+            for(value in invalid) {
+                assertEquals(retry,PetDialogue.parse("hello "+value+" world",language))
+                assertEquals(retry,PetDialogue.parse(JSONObject().put("reply","hello "+value+" world").put("action","wave").toString(),language))
+            }
+            for(escaped in listOf("\\ud83d","\\udc00","\\u0000","\\u0001","\\u001f", "\\u0000Hi", "Hi\\u0000"))
+                assertEquals(retry,PetDialogue.parse("{\"reply\":\"$escaped\",\"action\":\"wave\"}",language))
+        }
+    }
+    @Test fun rawControlsInsideJsonStringsUseRetry() {
+        for(char in listOf('\t','\n','\r')) {
+            val raw="{\"reply\":\"hello $char world\",\"action\":\"wave\"}"
+            assertEquals(PetDialogue.parse("","en"),PetDialogue.parse(raw,"en"))
+        }
+    }
+    @Test fun validSurrogatePairsAndProseLayoutRemainReadable() {
+        val text="Hello 😀 한글 日本語"
+        assertEquals(text,PetDialogue.parse(text,"en").text)
+        assertEquals(PetDialogue.Reply(text,PetExpression.WAVE),
+            PetDialogue.parse("{\"reply\":\"Hello \\ud83d\\ude00 한글 日本語\",\"action\":\"wave\"}","en"))
+        assertEquals("Line one\nLine two\tindented\r\nDone",PetDialogue.parse("Line one\nLine two\tindented\r\nDone","en").text)
+        assertEquals("Line one\nLine two",PetDialogue.parse("{\"reply\":\"Line one\\nLine two\",\"action\":\"none\"}","en").text)
     }
     @Test fun stateGatesProtectEggSleepIllnessAndCareRules() {
         assertEquals(PetExpression.NOD,PetDialogue.allowed(PetExpression.DANCE,baby.copy(hatched=false)))
