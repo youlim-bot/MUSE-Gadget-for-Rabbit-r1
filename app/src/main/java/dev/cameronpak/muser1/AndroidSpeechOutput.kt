@@ -16,8 +16,9 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
     private val handler = Handler(Looper.getMainLooper())
     private val manager = context.getSystemService(AudioManager::class.java)
     var onReading: (String, Int) -> Unit = { _, _ -> }
-    private val ranges = mutableMapOf<String, Pair<String, Int>>()
-    private val pending = ArrayDeque<String>()
+    private data class Pending(val text: String, val language: String, val full: () -> String, val offset: Int)
+    private val ranges = mutableMapOf<String, Pair<() -> String, Int>>()
+    private val pending = ArrayDeque<Pending>()
     private val active = mutableSetOf<String>()
     private var ready = false
     private var failure: String? = null
@@ -38,9 +39,9 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
         engine.voices?.firstOrNull { it.locale.language == Locale.KOREAN.language && !it.isNetworkConnectionRequired }?.let { engine.voice = it }
         engine.setAudioAttributes(attributes)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) { handler.post { if (id in active) { onState("MUSE IS SPEAKING"); ranges[id]?.let { onReading(it.first, it.second) } } } }
+            override fun onStart(id: String?) { handler.post { if (id in active) { onState("MUSE IS SPEAKING"); ranges[id]?.let { onReading(it.first(), it.second) } } } }
             override fun onRangeStart(id: String?, start: Int, end: Int, frame: Int) {
-                handler.post { if (id in active) ranges[id]?.let { onReading(it.first, it.second + start) } }
+                handler.post { if (id in active) ranges[id]?.let { onReading(it.first(), it.second + start) } }
             }
             override fun onDone(id: String?) { handler.post {
                 ranges.remove(id)
@@ -56,10 +57,10 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
         drain()
     }
 
-    fun speak(text: String) {
+    fun speak(text: String, language: String = "ko", full: () -> String = { text }, offset: Int = 0) {
         if (closed || text.isBlank()) return
         failure?.let { onState(it); return }
-        pending.addLast(text)
+        pending.addLast(Pending(text, language, full, offset))
         if (ready) drain()
     }
 
@@ -70,12 +71,15 @@ internal class AndroidSpeechOutput(private val context: Context, private val onS
         }
         engine.setSpeechRate(ReadingSettings.speed(context))
         while (pending.isNotEmpty()) {
-            val full = pending.removeFirst()
-            var offset = 0
-            for (part in full.chunked(TextToSpeech.getMaxSpeechInputLength() - 1)) {
+            val item = pending.removeFirst()
+            if (engine.setLanguage(Locale.forLanguageTag(item.language)) < 0) {
+                stop(); onState("SPEECH UNAVAILABLE"); return
+            }
+            var offset = item.offset
+            for (part in item.text.chunked(TextToSpeech.getMaxSpeechInputLength() - 1)) {
                 val id = UUID.randomUUID().toString()
                 active.add(id)
-                ranges[id] = full to offset
+                ranges[id] = item.full to offset
                 offset += part.length
                 if (engine.speak(part, TextToSpeech.QUEUE_ADD, null, id) == TextToSpeech.ERROR) {
                     stop(); onState("SPEECH FAILED"); return

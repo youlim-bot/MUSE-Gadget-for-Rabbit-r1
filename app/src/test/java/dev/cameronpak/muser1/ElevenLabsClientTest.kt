@@ -32,17 +32,17 @@ class ElevenLabsClientTest {
             assertFalse(server.takeRequest().body.readUtf8().contains("name=\"language_code\""))
         }
     }
-    @Test fun outputUsesV4DialogueAndKorean() = runBlocking {
+    @Test fun outputUsesV4SpeechAndKorean() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody("fake-audio"))
             val api = ElevenLabsClient(ElevenLabsConfig("test-key", "voice123"), server.url("").toString().trimEnd('/'))
             assertEquals("fake-audio", api.synthesize("안녕하세요").toString(Charsets.UTF_8))
             val request = server.takeRequest()
-            assertTrue(request.path!!.startsWith("/v1/text-to-dialogue?"))
+            assertTrue(request.path!!.startsWith("/v1/text-to-speech/voice123?"))
             val json = JSONObject(request.body.readUtf8())
             assertEquals("eleven_v4", json.getString("model_id"))
             assertEquals("ko", json.getString("language_code"))
-            assertEquals("voice123", json.getJSONArray("inputs").getJSONObject(0).getString("voice_id"))
+            assertEquals("안녕하세요", json.getString("text"))
         }
     }
     @Test fun explicitInputAndTranslationOutputLanguagesReachApi() = runBlocking {

@@ -6,11 +6,12 @@ The native Android app remains package `dev.cameronpak.muser1` so same-key updat
 |---|---|
 | `MainActivity.kt`, `MuseScreen.kt`, `UiText.kt` | Main conversation, reserved controls, flags, prompts, avatar and state rendering |
 | `SideButtonService.kt`, `SideButtonGesture.kt`, `hardware/mtk-kpd.kl` | Physical-button accessibility routing, hold/tap/volume; camera foreground routing |
-| `VoiceRecorder.kt`, `SentenceBoundary.kt` | Bounded PCM/WAV capture and continuous-mode endpoint detection |
+| `VoiceRecorder.kt`, `SentenceBoundary.kt` | Bounded PCM/WAV capture, continuous-mode endpoint detection and reply sentence boundaries |
 | `LanguageMode.kt` | Input/target language, translation prompt and swap behavior |
 | `ElevenLabsClient.kt`, `SpeechOutput.kt`, `AndroidSpeechOutput.kt` | Optional STT/TTS requests, playback and Android fallback |
 | `CameraActivity.kt`, `PhotoQuestion.kt`, `PhotoPrompts.kt`, `transport/PhotoPayload.kt` | Camera selection, capture/review, bounded image payload, translation and in-memory follow-up |
 | `LibraryActivity.kt`, `LibraryStore.kt`, `TodoDraft.kt` | Local search/favorites/memos/checklists, task extraction validation |
+| `ReplySpeechStream.kt`, `ReplyWaiting.kt` | Incremental reply sentence consumption, localized waiting schedule and voice cache keys |
 | `ReadingSettings.kt` | Persistent conversation text size and playback speed |
 | `CredentialStore.kt`, pairing and transport packages | Encrypted credentials, Bluetooth provisioning and Muse connection |
 | `DisplayHistory.kt` | Ordered local text-history persistence; no deletion of remote conversation |
@@ -164,3 +165,44 @@ also return their actual reason if a meal chooser is already open. Egg care
 retains Warm rather than giving the egg a meal. Same-timestamp accepted meals
 produce the normal care/audio event without relying on a change in fedAt; food
 caps at 100, cake still costs health, counters saturate and wardrobe unlocks once.
+
+
+## Sentence-streamed replies and waiting (Wave 23)
+
+Non-pet turns enqueue complete sentences while Muse sends reply text; completion
+flushes only the remainder. Each message tracks consumed text once and supplies
+absolute UTF-16 reading offsets, preserving manual scroll pause as text grows.
+Quiet mode and the per-turn speech stop suppress further audio. Conversation
+keeps Korean, interpretation uses its target, and practice its selected language.
+Pet JSON buffering and completed-reply dialogue speech remain unchanged.
+
+Sentence speech uses Eleven v4 `/v1/text-to-speech/{voice_id}/with-timestamps`,
+passing `previous_text` and already available `next_text`. Unsupported timing
+HTTP 400/404/422 falls back to plain TTS with the same voice and context. Each
+request remains bounded to 1,800 characters and downloads before playback; this
+is sentence streaming, not playback of incoming audio bytes. If a final snapshot
+rewrites an already spoken prefix, further speech for that message is suppressed
+to avoid replay; previously played audio cannot be retracted.
+
+
+Before the first non-pet reply text, localized KO/JA/EN status uses mail, calendar,
+weather, news, search or thinking phrases, changing at 8 and 15 seconds.
+`MuseConnection` currently exposes no agent-activity callback, so classification
+uses the typed text or transcript; no activity payloads are logged. First text,
+completion, cancellation, disconnect and timeout cancel the waiting schedule.
+The default-on settings entry "대기 음성 / 待機音声 / Waiting voice" permits a
+single cached cue at 2.5 seconds. Quiet, pet and interpretation modes suppress it.
+An idle-only background task prewarms the configured voice and display language;
+SHA-256 filenames include voice ID, model and language, without credentials.
+A cache miss skips the cue, and turn startup cancels prewarming. The same serial
+playback worker finishes a playing cue before reply speech, without overlap.
+
+The ElevenLabs [TTS contract](https://elevenlabs.io/docs/api-reference/text-to-speech/convert)
+and [official v4 stitching example](https://github.com/elevenlabs/skills/blob/main/text-to-speech/SKILL.md)
+document previous/next text. Unit tests use local mock HTTP only. Live Muse,
+ElevenLabs latency/prosody, cache generation, audio output and physical R1
+behavior require authorized hands-on verification; no speed measurement is claimed.
+
+The public offline DEMO keeps its isolated package, fictional fixtures and
+permission restrictions. Waiting-voice prewarming and playback explicitly return
+in DEMO builds, even if credential-like test data is present.

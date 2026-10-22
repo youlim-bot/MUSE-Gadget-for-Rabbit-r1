@@ -60,7 +60,10 @@ internal class MuseScreen(
     }
 
     internal fun followSpeech(text: String, offset: Int) {
-        if (readingText != text) { readingText = text; readingPaused = false }
+        if (readingText != text) {
+            if (readingText?.let { text.startsWith(it) } != true) readingPaused = false
+            readingText = text
+        }
         readingOffset = offset
         followingLatest = false
         if (!readingPaused) scroll.post { scrollToSpeech() }

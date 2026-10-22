@@ -19,7 +19,45 @@ internal class SpeechOutput(private val context: Context, private val onState: (
     private val store get() = (context.applicationContext as MuseApp).store
     var onReading: (String, Int) -> Unit = { _, _ -> }
     var onReadingEnd: () -> Unit = {}
-    private data class Part(val text: String, val full: String, val offset: Int, val language: String)
+    private data class Part(val text: String, val full: () -> String, val offset: Int, val language: String,
+                            val config: ElevenLabsConfig, val dialogue: Boolean = false, val cached: File? = null, val reading: Boolean = true)
+    private var warmup: Job? = null
+    private val warmed = mutableSetOf<String>()
+    fun cancelWarmup() { warmup?.cancel(); warmup = null }
+    private fun waitingFile(config: ElevenLabsConfig, language: String) = File(context.cacheDir,
+        "waiting-${ReplyWaiting.cacheKey(config.voiceId, ReplyWaiting.MODEL, language)}.mp3")
+
+    /** Idle only; callers cancel before a turn. A miss never creates a request on its behalf. */
+    fun warmWaiting(language: String) {
+        if (BuildConfig.DEMO || closed || hasPlayback || warmup?.isActive == true) return
+        val config = store.elevenLabs() ?: return
+        val key = ReplyWaiting.cacheKey(config.voiceId, ReplyWaiting.MODEL, language)
+        if (key in warmed) return
+        warmup = scope.launch {
+            delay(1000)
+            val target = waitingFile(config, language)
+            if (target.length() > 0) { warmed.add(key); return@launch }
+            try {
+                val audio = ElevenLabsClient(config).synthesize(ReplyWaiting.voice(language), language)
+                ensureActive()
+                withContext(Dispatchers.IO) {
+                    val temp = File.createTempFile("waiting-build-", ".mp3", context.cacheDir)
+                    try { temp.writeBytes(audio); check(temp.renameTo(target)) } finally { temp.delete() }
+                }
+                warmed.add(key)
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { warmed.add(key) } // Retry on next app start, never delay a turn.
+        }
+    }
+
+    fun playWaiting(language: String) {
+        if (BuildConfig.DEMO || closed) return
+        val config = store.elevenLabs() ?: return
+        val file = waitingFile(config, language)
+        if (file.length() <= 0) return
+        queue.add(Part("", { "" }, 0, language, config, cached = file, reading = false))
+        startWorker()
+    }
     private val queue = ArrayDeque<Part>()
     private var worker: Job? = null
     private var closed = false
@@ -40,22 +78,43 @@ internal class SpeechOutput(private val context: Context, private val onState: (
         if (closed || text.isBlank()) return
         val clean = text.replace("**", "")
         if (clean.isBlank()) return
+        enqueue(clean, 0, { clean }, language, dialogue = true)
+    }
+
+    fun enqueue(text: String, offset: Int, full: () -> String, language: String, dialogue: Boolean = false) {
+        if (closed || text.isBlank()) return
+        cancelWarmup()
         val config = store.elevenLabs()
-        if (config == null) { local.speak(clean); return }
+        if (config == null) { local.speak(text, language, full, offset); return }
         local.stop()
-        var offset = 0
-        clean.chunked(1800).forEach { part -> queue.add(Part(part, clean, offset, language)); offset += part.length }
+        var position = offset
+        text.chunked(1800).forEach { part ->
+            queue.add(Part(part, full, position, language, config, dialogue)); position += part.length
+        }
+        startWorker()
+    }
+
+    private fun startWorker() {
         if (worker?.isActive == true) return
         worker = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 if (manager.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                     queue.clear(); onState("AUDIO BUSY"); return@launch
                 }
-                val api = ElevenLabsClient(config)
                 while (queue.isNotEmpty()) {
-                    onState("ELEVEN V4 음성 생성 중")
                     val part = queue.removeFirst()
-                    val audio = api.synthesizeTimed(part.text, part.language)
+                    if (part.cached != null) {
+                        // Same serial worker owns the waiting clip and reply audio: no overlap.
+                        try { play(part.cached, TimedSpeech(byteArrayOf(), emptyList()), part) }
+                        catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { part.cached.delete() }
+                        continue
+                    }
+                    onState("ELEVEN V4 음성 생성 중")
+                    val full = part.full()
+                    val audio = ElevenLabsClient(part.config).synthesizeTimed(part.text, part.language,
+                        full.take(part.offset).takeLast(1800),
+                        full.drop(part.offset + part.text.length).take(1800), part.dialogue)
                     ensureActive()
                     val file = File.createTempFile("eleven-playback-", ".mp3", context.cacheDir)
                     try {
@@ -87,7 +146,7 @@ internal class SpeechOutput(private val context: Context, private val onState: (
                                 override fun run() {
                                     if (!cont.isActive) return
                                     val offset = audio.points.lastOrNull { point -> point.millis <= player.currentPosition }?.offset ?: 0
-                                    onReading(part.full, part.offset + offset)
+                                    if (part.reading) onReading(part.full(), part.offset + offset)
                                     handler.postDelayed(this, 100)
                                 }
                             }.also { task -> handler.post(task) } }
@@ -105,7 +164,7 @@ internal class SpeechOutput(private val context: Context, private val onState: (
     }
 
     fun stop() {
-        queue.clear(); worker?.cancel(); worker = null; local.stop(); onReadingEnd()
+        cancelWarmup(); queue.clear(); worker?.cancel(); worker = null; local.stop(); onReadingEnd()
         manager.abandonAudioFocusRequest(focus)
     }
     fun close() { closed = true; stop(); scope.cancel(); local.close() }

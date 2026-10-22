@@ -36,6 +36,41 @@ class MainActivity : MuseActivity() {
     private var connected = false
     private var recording = false
     private var sending = false
+        set(value) { field = value; if (!value) clearReplyWaiting() }
+    private var waitingJob: Job? = null
+    private var waitingStarted = 0L
+    private var waitingVoiceAttempted = false
+    private var replyStarted = false
+    private val replyStreams = mutableMapOf<String, ReplySpeechStream>()
+    private val waitingVoiceEnabled get() = getSharedPreferences("reply_options", MODE_PRIVATE).getBoolean("waiting_voice", true)
+    private fun displaySpeechLanguage() = when (UiText.language(this)) {
+        DisplayLanguage.KO -> "ko"; DisplayLanguage.JA -> "ja"; DisplayLanguage.EN -> "en"
+    }
+    private fun replyLanguage() = petDialogueTurn?.language ?: if (activeLanguageMode.interpreting) activeLanguageMode.target.code!!
+        else if (funModes.mode == "practice" && !activePetTurn) funModes.language.code!! else "ko"
+    private fun resetReplyStream() {
+        clearReplyWaiting(); replyStarted = false; replyStreams.clear(); speech.cancelWarmup()
+    }
+    private fun clearReplyWaiting() { waitingJob?.cancel(); waitingJob = null }
+    private fun startReplyWaiting() {
+        if (!sending || activePetTurn || replyStarted) return
+        clearReplyWaiting()
+        waitingStarted = android.os.SystemClock.elapsedRealtime(); waitingVoiceAttempted = false
+        waitingJob = scope.launch {
+            var shown = ""
+            while (sending && !replyStarted) {
+                val elapsed = android.os.SystemClock.elapsedRealtime() - waitingStarted
+                val phrase = ReplyWaiting.phrase(ReplyWaiting.topic(activeTurn?.user.orEmpty()), displaySpeechLanguage(), ReplyWaiting.stage(elapsed))
+                if (shown != phrase) { shown = phrase; updateStatus(phrase) }
+                if (ReplyWaiting.voiceDue(elapsed, waitingVoiceAttempted)) {
+                    waitingVoiceAttempted = true
+                    if (waitingVoiceEnabled && !quietMode && !replySpeechStopped && !activeLanguageMode.interpreting && !activePetTurn)
+                        speech.playWaiting(displaySpeechLanguage())
+                }
+                delay(100)
+            }
+        }
+    }
     private var pairingRequested = false
     private var repairPairingRequested = false
     private var pairingWindow: Job? = null
@@ -59,6 +94,8 @@ class MainActivity : MuseActivity() {
             if(foreground!==this@MainActivity)return
             val visible=::speech.isInitialized && speech.hasPlayback
             if(visible!=stopControlVisible)refreshQuickControls()
+            if (!recording && !sending && waitingVoiceEnabled && !quietMode && !inPetMode && !languageMode.interpreting)
+                speech.warmWaiting(displaySpeechLanguage())
             quickButton.postDelayed(this,200)
         }
     }
@@ -389,6 +426,10 @@ class MainActivity : MuseActivity() {
         refreshLanguageControls()
         enterFullscreen()
         speech = SpeechOutput(this) { state ->
+            if (sending && (state.contains("실패") || state in setOf("AUDIO BUSY", "AUDIO INTERRUPTED", "SPEECH FAILED", "SPEECH UNAVAILABLE"))) {
+                replySpeechStopped = true
+                if (continuous) stopContinuous()
+            }
             if (recording || sending) return@SpeechOutput
             updateStatus(state)
             if (continuous) {
@@ -703,6 +744,7 @@ class MainActivity : MuseActivity() {
         val entries=listOf(
             entry("wifi","Wi-Fi","",connection){openWifiPanel()},
             entry("reading",funText("글자 크기·음성 속도","文字サイズ・音声速度","Text size & voice speed"),funText("편하게 읽고 듣기","読みやすさ・聞きやすさ","Reading and speech preferences")){showReadingSettings()},
+            entry("waiting_voice",funText("대기 음성","待機音声","Waiting voice"),funText("응답을 기다릴 때 짧게 안내","応答を待つ間に短くご案内","Short cue while waiting")){showWaitingVoiceSettings()},
             entry("volume",funText("음량","音量","Volume"),funText("음성 답변·배경음 크기","音声応答・BGMの音量","Voice and music volume")){showVolumeSettings()},
             entry("brightness",funText("화면 밝기","画面の明るさ","Screen brightness"),funText("시스템 또는 20–100% 선택","システムまたは20–100%","System or 20–100%")){showBrightnessSettings()},
             entry("screen",funText("화면 자동 꺼짐","画面の自動消灯","Screen timeout"),funText("Muse 화면 계속 켜기 선택","Muse画面の常時点灯","Choose whether Muse stays awake")){showScreenTimeoutSettings()},
@@ -715,6 +757,15 @@ class MainActivity : MuseActivity() {
             else funText("Muse 연결 안 됨 · 페어링·사이드 버튼","Muse未接続 · ペアリング・ボタン","Muse offline · Pairing and side button")
         }.also { d-> d.setOnDismissListener{settingsDialog=null;lastInteraction=android.os.SystemClock.elapsedRealtime()};d.show() }
     }
+    private fun showWaitingVoiceSettings() {
+        controls = MuseAlertDialogBuilder(this).setTitle(funText("대기 음성", "待機音声", "Waiting voice"))
+            .setSingleChoiceItems(arrayOf(funText("켜기", "オン", "On"), funText("끄기", "オフ", "Off")), if (waitingVoiceEnabled) 0 else 1) { dialog, index ->
+                getSharedPreferences("reply_options", MODE_PRIVATE).edit().putBoolean("waiting_voice", index == 0).apply()
+                if (index != 0) speech.cancelWarmup()
+                dialog.dismiss()
+            }.setNegativeButton(tr("닫기"), null).show()
+    }
+
     private fun openWifiPanel() {
         if(BuildConfig.DEMO)return
         // Password entry stays in Android's trusted Wi-Fi dialog; Muse never receives it.
@@ -994,6 +1045,18 @@ class MainActivity : MuseActivity() {
         current.replies[id] = missionReply ?: petAnswer?.text ?: if (done && text.isNotEmpty()) text else current.replies.getOrDefault(id, "") + text
         historyStore.save(history)
         renderConversation()
+        val fullReply = current.replies.getValue(id)
+        if (fullReply.isNotBlank() && !replyStarted) {
+            replyStarted = true; clearReplyWaiting()
+            if (!activePetTurn) updateStatus(funText("답변 받는 중", "応答を受信中", "Receiving reply"))
+        }
+        if (!activePetTurn && mission == null && petDialogueTurn == null) {
+            val stream = replyStreams.getOrPut(id) { ReplySpeechStream() }
+            val parts = stream.update(fullReply, done)
+            if (!quietMode && !replySpeechStopped) parts.forEach { part ->
+                speech.enqueue(part.text, part.offset, { stream.text }, replyLanguage())
+            }
+        }
         if (done) {
             if(inPetMode && current !== petRewardedTurn && current.replies.getValue(id).isNotBlank()) {
                 petRoom?.agentReward();petRewardedTurn=current
@@ -1001,8 +1064,9 @@ class MainActivity : MuseActivity() {
             if(petAnswer!=null && petRoom===petDialogueRoom && inPetMode)petRoom?.answerExpression(petAnswer.expression)
             sending = false; turnTimeout?.cancel(); updateStatus("REPLY RECEIVED")
             if (current.replies.getValue(id).isBlank() && continuous) { stopContinuous(); return }
-            if (!quietMode && !replySpeechStopped) speech.speak(current.replies.getValue(id), petDialogueTurn?.language ?: if (activeLanguageMode.interpreting) activeLanguageMode.target.code!! else if(funModes.mode=="practice" && !activePetTurn)funModes.language.code!! else "ko")
-            else {
+            if (!quietMode && !replySpeechStopped && (activePetTurn || mission != null || petDialogueTurn != null))
+                speech.speak(fullReply, replyLanguage())
+            if (quietMode || replySpeechStopped || !speech.hasPlayback) {
                 releaseScreenAwake()
                 if (continuous) scheduleListening()
             }
@@ -1223,7 +1287,7 @@ class MainActivity : MuseActivity() {
                     connection=null;connected=false
                     val wasSending=sending
                     stopContinuous(false);finishRecording(false)
-                    sending=false;sendJob?.cancel();turnTimeout?.cancel();transcriptFetch?.cancel()
+                    sending=false;replySpeechStopped=true;speech.stop();sendJob?.cancel();turnTimeout?.cancel();transcriptFetch?.cancel()
                     transcriptPending=false
                     if(hasConversation)renderConversation()
                     if(wasSending)petRoom?.agentUpdate(funText("연결 끊김 · 자동 재전송하지 않음","接続切断 · 自動再送しません","Disconnected · No automatic resend"),reveal=true)
@@ -1367,9 +1431,10 @@ class MainActivity : MuseActivity() {
                     if (connection !== current || turn != thisTurn) return@launch
                     receiveTranscript(text)
                     if ((activePetTurn || funModes.mode!="practice") && handleLocalClock(text, true)) return@launch
-                    updateStatus("MUSE에 전송 중")
+                    startReplyWaiting()
                     withContext(Dispatchers.IO) { checkNotNull(current).sendText(petDialogueTurn?.payload(text) ?: if(funModes.mode=="practice" && !activePetTurn) practicePayload(text) else activeLanguageMode.message(text)) }
                 } else {
+                    startReplyWaiting()
                     val userId = withContext(Dispatchers.IO) { checkNotNull(current).sendVoice(wav, petDialogueTurn?.payload(null).orEmpty()) }
                     if (connection === current && turn == thisTurn && transcriptPending) fetchTranscript(current!!, userId, thisTurn)
                 }
@@ -1378,7 +1443,7 @@ class MainActivity : MuseActivity() {
                 currentCoroutineContext().ensureActive()
                 if (connection === current && turn == thisTurn) {
                     stopContinuous(false)
-                    sending = false; transcriptPending = false; turnTimeout?.cancel()
+                    sending = false; replySpeechStopped = true; speech.stop(); transcriptPending = false; turnTimeout?.cancel()
                     releaseScreenAwake()
                     updateStatus(if (error is ElevenLabsFailure) "음성 인식 실패 (HTTP ${error.status})" else "인식·전송 실패")
                     screen.showNotice("연결 상태와 ElevenLabs API 권한·잔여 사용량을 확인한 뒤 다시 말해 주세요.")
@@ -1438,6 +1503,7 @@ class MainActivity : MuseActivity() {
         activeLanguageMode = if (plainConversation || inPetMode) languageMode.copy(interpreting = false) else languageMode
         localTranscript = true
         replySpeechStopped=false
+        resetReplyStream()
         activePetTurn=inPetMode
         preparePetDialogue()
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { it.user = message; history.add(it) }
@@ -1445,13 +1511,14 @@ class MainActivity : MuseActivity() {
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "Muse에 전송 중", "Museに送信中", "Sending to Muse"))
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        startReplyWaiting()
         val payload = petDialogueTurn?.payload(message) ?: if(funModes.mode=="practice" && !plainConversation && !inPetMode) practicePayload(message) else activeLanguageMode.message(message)
         sendJob = scope.launch {
             try { withContext(Dispatchers.IO) { current.sendText(payload) } }
             catch (error: Exception) {
                 currentCoroutineContext().ensureActive()
                 if (connection === current) {
-                    sending = false; turnTimeout?.cancel()
+                    sending = false; replySpeechStopped = true; speech.stop(); turnTimeout?.cancel()
                     releaseScreenAwake()
                     updateStatus("SEND FAILED")
                     screen.showNotice(UiText.text(this@MainActivity, "전송을 확인하지 못했습니다. 자동 재전송하지 않습니다.", "送信を確認できませんでした。自動再送はしません。", "Delivery could not be confirmed. No automatic retry."))
@@ -1481,6 +1548,7 @@ class MainActivity : MuseActivity() {
         activeLanguageMode = languageMode.copy(interpreting = true, target = request.replyLanguage)
         localTranscript = true
         replySpeechStopped=false
+        resetReplyStream()
         activePetTurn=inPetMode
         petDialogueTurn=null;petDialogueRoom=null
         activeTurn = ConversationTurn().also { it.user = UiText.text(this, "[사진] ", "[写真] ", "[Photo] ") + request.question; history.add(it) }
@@ -1489,13 +1557,14 @@ class MainActivity : MuseActivity() {
         sending = true; transcriptPending = false
         historyStore.save(history); screen.jumpToLatest(); renderConversation()
         updateStatus(UiText.text(this, "사진을 Muse에 전송 중", "写真をMuseに送信中", "Sending photo to Muse"))
+        startReplyWaiting()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         sendJob = scope.launch {
             try { withContext(Dispatchers.IO) { current.sendPhoto(request.jpeg, if(missionPhoto===request)PetMission.prompt(request.petMissionTarget,request.replyLanguage.code?:"ko") else request.question) } }
             catch (error: Exception) {
                 currentCoroutineContext().ensureActive()
                 if (connection === current) {
-                    sending = false; turnTimeout?.cancel()
+                    sending = false; replySpeechStopped = true; speech.stop(); turnTimeout?.cancel()
                     releaseScreenAwake()
                     updateStatus("PHOTO SEND FAILED")
                     screen.showNotice(UiText.text(this@MainActivity, "사진 전송을 확인하지 못했습니다. 자동으로 재전송하지 않습니다.", "写真の送信を確認できませんでした。自動再送はしません。", "Photo delivery could not be confirmed. It will not be resent automatically."))
@@ -1510,6 +1579,7 @@ class MainActivity : MuseActivity() {
         activeLanguageMode = if(inPetMode)languageMode.copy(interpreting=false,input=InputLanguage.entries.firstOrNull { it.code==petRoom?.practiceLanguage }?:languageMode.input) else if(funModes.mode=="practice")languageMode.copy(interpreting=false,input=funModes.language) else languageMode
         localTranscript = store.elevenLabs() != null
         replySpeechStopped=false
+        resetReplyStream()
         activePetTurn=inPetMode
         preparePetDialogue()
         activeTurn = ConversationTurn(translationTarget = if (activeLanguageMode.interpreting) activeLanguageMode.target.label else null).also { history.add(it) }
@@ -1586,12 +1656,13 @@ class MainActivity : MuseActivity() {
         reconnectJob?.cancel();reconnectJob=null;reconnectAttempt=0
         continuous = false; resumeListening?.cancel(); sendJob?.cancel()
         if (recording) finishRecording(false)
-        connected = false; sending = false; turnTimeout?.cancel(); transcriptFetch?.cancel()
+        connected = false; sending = false; replySpeechStopped=true; speech.stop(); turnTimeout?.cancel(); transcriptFetch?.cancel()
         transcriptPending = false
         if (hasConversation && !recording) renderConversation()
         releaseScreenAwake();val previous=connection;connection=null;previous?.close()
     }
     override fun onPause() {
+        speech.cancelWarmup()
         petRoom?.cancelAgentInput()
         reconnectJob?.cancel();reconnectJob=null
         if(networkWatching) {
