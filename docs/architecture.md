@@ -24,6 +24,17 @@ Library favorites are independent snapshots. Task extraction sends a memo to Mus
 
 The demo build strips Internet/microphone/camera permissions and the accessibility service, skips account import/connection, and seeds only hard-coded fictional data. Its native UI uses the same view classes. Fixture content must not be confused with a live result.
 
+Settings → Power off asks for confirmation, then requests Android's system power
+menu through the enabled, bound `SideButtonService` using
+`performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)`. The user selects Power off in
+that system menu. No additional accessibility capability, shutdown/reboot permission,
+root command or keylayout change is used; side-button gestures remain unchanged.
+Recording or sending ignores the request, including at confirmation time. A disabled
+or unbound service shows localized guidance without opening settings; a rejected
+global action shows a localized failure notice. Labels, confirmation and notices
+support KO/JA/EN. The menu remains visible in DEMO, but its removed accessibility
+service means selecting it only shows the service-required notice.
+
 Read [privacy](../SECURITY.md), [build/verification](development.md), and the language guides for behavior and limitations. Protocol/cryptography provenance remains next to the vendored source.
 
 ## Local clock and speech controls

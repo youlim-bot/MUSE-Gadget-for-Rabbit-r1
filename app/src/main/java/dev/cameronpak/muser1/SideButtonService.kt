@@ -149,6 +149,9 @@ class SideButtonService : AccessibilityService() {
         if (pressedActivity === activity || recordingActivity === activity) cancelGesture()
     }
 
+    /** Global actions need no additional accessibility capability or shutdown permission. */
+    internal fun openPowerMenu(): Boolean = performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+
     private fun cancelGesture() {
         handler.removeCallbacks(hold)
         handle(gesture.cancel())
@@ -174,5 +177,17 @@ class SideButtonService : AccessibilityService() {
     companion object {
         internal var instance: SideButtonService? = null
             private set
+
+        internal fun powerMenuService(context: Context): SideButtonService? {
+            val bound = instance ?: return null
+            val manager = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+            val enabled = manager.getEnabledAccessibilityServiceList(
+                android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK
+            ).any {
+                val info = it.resolveInfo.serviceInfo
+                info.packageName == context.packageName && info.name == SideButtonService::class.java.name
+            }
+            return bound.takeIf { enabled }
+        }
     }
 }

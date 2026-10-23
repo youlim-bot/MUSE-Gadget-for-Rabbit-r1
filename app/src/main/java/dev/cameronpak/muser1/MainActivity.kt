@@ -750,12 +750,33 @@ class MainActivity : MuseActivity() {
             entry("screen",funText("화면 자동 꺼짐","画面の自動消灯","Screen timeout"),funText("Muse 화면 계속 켜기 선택","Muse画面の常時点灯","Choose whether Muse stays awake")){showScreenTimeoutSettings()},
             entry("clock",funText("충전 중 탁상시계","充電中の置き時計","Charging desk clock"),funText("시계 표시·전환 대기 시간","時計表示・切替待ち時間","Clock display and idle delay")){showDeskClockSettings()},
             entry("avatar",funText("반응하는 아바타","アバターの動き","Reactive avatar"),funText("대화 중 아바타 움직임","会話中のアバターの動き","Avatar animation during conversation")){showAvatarSettings()},
-            entry("language",funText("표시 언어","表示言語","Display language"),"한국어 · 日本語 · English"){showSettingsLanguage()}
+            entry("language",funText("표시 언어","表示言語","Display language"),"한국어 · 日本語 · English"){showSettingsLanguage()},
+            entry("power",funText("전원 끄기","電源を切る","Power off"),funText("Android 전원 메뉴 열기","Androidの電源メニューを開く","Open Android's power menu"),funText("기기","端末","Device")){requestPowerMenu()}
         )
         settingsDialog=MuseSettingsDialog(this,entries,::wifiSettingsSummary){
             if(connected)funText("Muse 연결됨 · 사이드 버튼·시스템","Muse接続済み · ボタン・システム","Muse connected · Buttons and system")
             else funText("Muse 연결 안 됨 · 페어링·사이드 버튼","Muse未接続 · ペアリング・ボタン","Muse offline · Pairing and side button")
         }.also { d-> d.setOnDismissListener{settingsDialog=null;lastInteraction=android.os.SystemClock.elapsedRealtime()};d.show() }
+    }
+    private fun requestPowerMenu(confirmed: Boolean = false) {
+        val service = SideButtonService.powerMenuService(this)
+        fun notice(text: String) = android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_LONG).show()
+        when (PowerMenuRequest.decide(recording, sending, service != null, confirmed)) {
+            PowerMenuRequest.Action.IGNORE -> Unit
+            PowerMenuRequest.Action.SERVICE_REQUIRED -> notice(funText(
+                "옆 버튼 제어를 켜야 사용할 수 있어요", "サイドボタン操作を有効にしてください", "Enable Side button controls to use this"))
+            PowerMenuRequest.Action.CONFIRM -> {
+                if (controls?.isShowing == true) return
+                controls = MuseAlertDialogBuilder(this)
+                    .setTitle(funText("전원 메뉴를 열까요?", "電源メニューを開きますか？", "Open the power menu?"))
+                    .setMessage(funText("시스템 메뉴에서 전원 끄기를 선택하세요.", "システムメニューで「電源を切る」を選んでください。", "Choose Power off in the system menu."))
+                    .setNegativeButton(tr("Cancel"), null)
+                    .setPositiveButton(funText("열기", "開く", "Open")) { _, _ -> requestPowerMenu(confirmed = true) }
+                    .show()
+            }
+            PowerMenuRequest.Action.OPEN_POWER_MENU -> if (service?.openPowerMenu() != true) notice(funText(
+                "전원 메뉴를 열지 못했어요. 다시 시도해 주세요.", "電源メニューを開けませんでした。もう一度お試しください。", "Couldn't open the power menu. Try again."))
+        }
     }
     private fun showWaitingVoiceSettings() {
         controls = MuseAlertDialogBuilder(this).setTitle(funText("대기 음성", "待機音声", "Waiting voice"))
