@@ -8,7 +8,7 @@ internal object ReplyWaiting {
     const val VOICE_MS = 2500L
     const val SECOND_MS = 8000L
     const val THIRD_MS = 15000L
-    const val MODEL = "eleven_v4"
+    const val MODEL = "eleven_v4_turbo"
     fun stage(elapsed: Long) = when { elapsed >= THIRD_MS -> 2; elapsed >= SECOND_MS -> 1; else -> 0 }
     fun voiceDue(elapsed: Long, attempted: Boolean) = elapsed >= VOICE_MS && !attempted
     fun topic(text: String): WaitingTopic {

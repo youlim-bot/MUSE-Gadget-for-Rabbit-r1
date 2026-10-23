@@ -169,7 +169,7 @@ adb shell cmd package set-home-activity dev.cameronpak.muser1/.MainActivity
 
 ## 7. ElevenLabs·언어·음성
 
-선택 기능인 ElevenLabs는 STT에 `scribe_v2`(`/v1/speech-to-text`), TTS에 `eleven_v4`(`/v1/text-to-dialogue`)를 요청합니다. 이는 소스에 구현된 식별자이며 모든 계정에서 사용 가능하다는 뜻은 아닙니다. [공식 문서](https://elevenlabs.io/docs)와 본인 계정의 모델·음성 접근 권한을 확인하세요. API 비용이 발생할 수 있습니다.
+선택 기능인 ElevenLabs는 STT에 `scribe_v2`(`/v1/speech-to-text`), TTS에 `eleven_v4_turbo`(`/v1/text-to-dialogue`)를 요청합니다. 이는 소스에 구현된 식별자이며 모든 계정에서 사용 가능하다는 뜻은 아닙니다. [공식 문서](https://elevenlabs.io/docs)와 본인 계정의 모델·음성 접근 권한을 확인하세요. API 비용이 발생할 수 있습니다.
 
 R1 한 대를 연결한 뒤 `python3 scripts/provision-elevenlabs.py`를 실행합니다. API 키는 숨김 입력, Voice ID는 본인의 음성을 입력합니다. 모델·음성 접근을 확인한 후 앱 전용 임시 파일을 거쳐 암호화 저장합니다. 음성 생성은 실행하지 않습니다. 라이브러리 음성은 필요하면 먼저 본인 계정에 추가하세요. STT/TTS 생성, Models/Voices 읽기 권한이 필요합니다. **HTTP 400 자체를 권한 문제로 단정하지 않습니다.** `voice_not_found`는 해당 계정에서 Voice ID를 쓸 수 없다는 경우도 포함합니다.
 

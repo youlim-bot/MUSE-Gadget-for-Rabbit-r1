@@ -27,7 +27,7 @@ class TimedSpeechClientTest {
                 val request = server.takeRequest()
                 assertTrue(request.path!!.startsWith("/v1/text-to-speech/test-voice"))
                 val json = org.json.JSONObject(request.body.readUtf8())
-                assertEquals("eleven_v4", json.getString("model_id"))
+                assertEquals(ReplyWaiting.MODEL, json.getString("model_id"))
                 assertEquals("ja", json.getString("language_code"))
                 assertEquals("before", json.getString("previous_text"))
                 assertEquals("after", json.getString("next_text"))

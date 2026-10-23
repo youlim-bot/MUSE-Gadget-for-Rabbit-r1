@@ -165,7 +165,7 @@ To restore native button mapping, temporarily enable Rooted debugging, run `adb 
 
 ## 7. ElevenLabs and languages
 
-Optional ElevenLabs integration uses `scribe_v2` at `/v1/speech-to-text` and `eleven_v4` at `/v1/text-to-dialogue`. These are the model identifiers in the implementation, not a guarantee that every account supports them. Check [ElevenLabs documentation](https://elevenlabs.io/docs) and your model/voice availability. API usage can incur charges.
+Optional ElevenLabs integration uses `scribe_v2` at `/v1/speech-to-text` and `eleven_v4_turbo` at `/v1/text-to-dialogue`. These are the model identifiers in the implementation, not a guarantee that every account supports them. Check [ElevenLabs documentation](https://elevenlabs.io/docs) and your model/voice availability. API usage can incur charges.
 
 Run `python3 scripts/provision-elevenlabs.py` with one r1 attached. It prompts privately for an API key and asks for your voice ID, validates model/voice access, and transfers an app-private pending file for encrypted import. It does not generate audio. Add a library voice to your account beforehand if needed. Key permissions must cover STT/TTS generation and model/voice reads. **HTTP 400 alone does not prove a permissions issue**; `voice_not_found` can mean the selected voice is not accessible in the account.
 

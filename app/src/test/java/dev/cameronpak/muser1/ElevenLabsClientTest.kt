@@ -40,7 +40,7 @@ class ElevenLabsClientTest {
             val request = server.takeRequest()
             assertTrue(request.path!!.startsWith("/v1/text-to-speech/voice123?"))
             val json = JSONObject(request.body.readUtf8())
-            assertEquals("eleven_v4", json.getString("model_id"))
+            assertEquals(ReplyWaiting.MODEL, json.getString("model_id"))
             assertEquals("ko", json.getString("language_code"))
             assertEquals("안녕하세요", json.getString("text"))
         }

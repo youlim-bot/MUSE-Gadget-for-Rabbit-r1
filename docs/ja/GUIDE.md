@@ -169,7 +169,7 @@ adb shell cmd package set-home-activity dev.cameronpak.muser1/.MainActivity
 
 ## 7. ElevenLabs・言語・音声
 
-任意のElevenLabs連携はSTTに `scribe_v2`（`/v1/speech-to-text`）、TTSに `eleven_v4`（`/v1/text-to-dialogue`）を要求します。ソース上の識別子であり、すべてのアカウントで利用できる保証ではありません。[公式資料](https://elevenlabs.io/docs)とアカウントのモデル・音声へのアクセスを確認してください。API利用料金が発生する場合があります。
+任意のElevenLabs連携はSTTに `scribe_v2`（`/v1/speech-to-text`）、TTSに `eleven_v4_turbo`（`/v1/text-to-dialogue`）を要求します。ソース上の識別子であり、すべてのアカウントで利用できる保証ではありません。[公式資料](https://elevenlabs.io/docs)とアカウントのモデル・音声へのアクセスを確認してください。API利用料金が発生する場合があります。
 
 r1を1台接続し `python3 scripts/provision-elevenlabs.py` を実行します。APIキーは非表示入力で、Voice IDは自分の音声を指定します。モデル・音声を確認し、アプリ専用一時ファイル経由で暗号化保存します。音声生成は実行しません。必要ならライブラリの音声を先に自分のアカウントへ追加します。STT/TTS生成、Models/Voices読み取り権限が必要です。**HTTP 400だけで権限不足と断定しないでください。** `voice_not_found` はそのアカウントで音声が利用できない場合にも発生します。
 
